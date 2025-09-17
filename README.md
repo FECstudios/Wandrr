@@ -25,7 +25,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/wandrr.git
+   git clone [https://github.com/your-username/wandrr.git](https://github.com/FECstudios/Wandrr/tree/main)
    ```
 2. Navigate to the project directory:
    ```bash
@@ -35,11 +35,12 @@ These instructions will get you a copy of the project up and running on your loc
    ```bash
    npm install
    ```
-4. Create a `.env.local` file in the root of the project and add your API keys:
+4. Create a `.env` file in the root of the project and add your API keys: (get keys from shov.com)
    ```
-   SHOV_PROJECT=wandrr-mvp
-   SHOV_API_KEY=your_shov_api_key
-   OPENAI_API_KEY=your_openai_api_key
+   SHOV_API_KEY=
+   SHOV_PROJECT=
+   HF_TOKEN=
+   JWT_SECRET=
    ```
 
 ### Running the Application
