@@ -55,14 +55,14 @@ export default async function handler(req, res) {
     const user = userResults?.items?.[0]?.value;
 
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials. Try refresing page' });
+      return res.status(401).json({ message: 'Invalid credentials. Try refreshing page' });
     }
 
     // Compare provided password with hashed password
     const isPasswordValid = await bcrypt.compare(password, user.hashedPassword);
 
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials. Try refresing page' });
+      return res.status(401).json({ message: 'Invalid credentials. Try refreshing page' });
     }
 
     // Generate JWT token
