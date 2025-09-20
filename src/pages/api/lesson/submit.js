@@ -10,6 +10,7 @@ export default async function handler(req, res) {
 
   const { user, lesson, answer } = req.body;
   const userId = user?.id;
+  const userShovId = user?.shovId; // Try to get cached Shov ID first
 
   if (!userId || !lesson || !lesson.shovId || answer === undefined) {
     return res.status(400).json({ message: 'Missing required fields: user object, lesson object, answer' });
@@ -21,20 +22,72 @@ export default async function handler(req, res) {
   });
 
   try {
-    let userShovId;
-    try {
-      const userSearchResults = await shov.search('user', { 
-        collection: 'users', 
-        filters: { id: userId },
-        limit: 1
-      });
-      userShovId = userSearchResults?.items?.[0]?.id;
-      if (!userShovId) {
-        throw new Error('User not found in database, cannot get Shov ID.');
+    let finalUserShovId = userShovId;
+    
+    // Only fetch Shov ID if not already cached in user object
+    if (!finalUserShovId) {
+      console.log(`[Submit API] Shov ID not cached, fetching for user ${userId}...`);
+      
+      // --- Enhanced Retry Logic for fetching user Shov ID (FALLBACK ONLY) ---
+      let attempts = 0;
+      const maxAttempts = 5;
+      const baseDelay = 1000;
+
+      while (attempts < maxAttempts) {
+        try {
+          attempts++;
+          console.log(`[Submit API] Fetching user Shov ID... (Attempt ${attempts}/${maxAttempts})`);
+          
+          const userSearchResults = await shov.search('user', { 
+            collection: 'users', 
+            filters: { id: userId },
+            limit: 1
+          });
+          
+          finalUserShovId = userSearchResults?.items?.[0]?.id;
+          if (!finalUserShovId) {
+            throw new Error('User not found in database, cannot get Shov ID.');
+          }
+          
+          console.log(`[Submit API] Attempt ${attempts} successful, user Shov ID found: ${finalUserShovId}`);
+          break; // Success, exit loop
+          
+        } catch (error) {
+          console.error(`[Submit API] Attempt ${attempts} to fetch user failed:`, error.message);
+          
+          // Check if it's a capacity/rate limit error
+          const isRateLimitError = error.message.includes('Capacity temporarily exceeded') || 
+                                 error.message.includes('rate limit') ||
+                                 error.message.includes('3040');
+          
+          if (attempts >= maxAttempts) {
+            if (isRateLimitError) {
+              console.error(`[Submit API] Rate limit exceeded after ${maxAttempts} attempts. Service temporarily unavailable.`);
+              return res.status(503).json({ 
+                message: 'Service temporarily unavailable due to high demand. Please try again in a moment.',
+                retryAfter: 30
+              });
+            } else {
+              console.error('Failed to retrieve user Shov ID:', error.message);
+              return res.status(500).json({ 
+                message: 'Could not retrieve user database ID.', 
+                error: error.message 
+              });
+            }
+          }
+          
+          // Calculate exponential backoff delay with jitter for rate limiting
+          const delay = isRateLimitError 
+            ? baseDelay * Math.pow(3, attempts - 1) + Math.random() * 1000 // Longer delay for rate limits
+            : baseDelay * Math.pow(2, attempts - 1); // Standard exponential backoff
+          
+          console.log(`[Submit API] Waiting ${Math.round(delay)}ms before retry attempt...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-    } catch (error) {
-        console.error('Failed to retrieve user Shov ID:', error.message);
-        return res.status(500).json({ message: 'Could not retrieve user database ID.', error: error.message });
+      // --- End Enhanced Retry Logic ---
+    } else {
+      console.log(`[Submit API] Using cached Shov ID: ${finalUserShovId}`);
     }
 
     const isCorrect = String(lesson.answer) === String(answer);
@@ -50,14 +103,19 @@ export default async function handler(req, res) {
       updatedUser.mistakes = [...(user.mistakes || []), { lessonId: lessonIdForTracking, submittedAnswer: answer }];
     }
 
-    console.log(`Updating user ${userShovId} with new data:`, updatedUser);
+    console.log(`Updating user ${finalUserShovId} with new data:`, updatedUser);
     
     // CORRECTED: Use the shov.update() method as per the documentation.
-    await shov.update('users', userShovId, updatedUser);
+    await shov.update('users', finalUserShovId, updatedUser);
     
     console.log('User updated successfully in Shov.');
 
-    const responseData = { correct: isCorrect, correctAnswer: lesson.answer, updatedUser: updatedUser };
+    // Return updated user with cached Shov ID for future requests
+    const responseData = { 
+      correct: isCorrect, 
+      correctAnswer: lesson.answer, 
+      updatedUser: { ...updatedUser, shovId: finalUserShovId } // Cache Shov ID
+    };
     res.status(200).json(responseData);
 
   } catch (error) {

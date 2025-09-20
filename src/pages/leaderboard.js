@@ -3,7 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { jwtDecode } from 'jwt-decode';
-import ProgressBar from '../components/ProgressBar';
+import { LoadingBar, LoadingSpinner } from '../components/ProgressBar';
 
 export default function Leaderboard() {
   const [users, setUsers] = useState([]);
@@ -34,9 +34,17 @@ export default function Leaderboard() {
     if (!userId) return; // Wait for userId to be set from token
 
     async function fetchLeaderboard() {
+      setLoading(true);
+      setError(null);
+      
       try {
         const res = await fetch('/api/leaderboard');
-        if (!res.ok) throw new Error('Failed to fetch leaderboard');
+        if (!res.ok) {
+          if (res.status === 503) {
+            throw new Error('Service is temporarily busy. Please try again in a moment.');
+          }
+          throw new Error('Failed to fetch leaderboard');
+        }
         const data = await res.json();
         setUsers(data);
       } catch (err) {
@@ -45,11 +53,16 @@ export default function Leaderboard() {
         setLoading(false);
       }
     }
+    
     fetchLeaderboard();
   }, [userId]);
 
   if (!userId) {
-    return <ProgressBar />;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingBar message="Loading leaderboard..." showMessage={true} />
+      </div>
+    );
   }
 
   return (
@@ -77,21 +90,77 @@ export default function Leaderboard() {
       </header>
 
       <main className="max-w-4xl mx-auto p-4">
-        {loading && <ProgressBar />}
-        {error && <p className="text-red-500 text-center">{error}</p>}
+        {loading && (
+          <LoadingBar 
+            message="Fetching leaderboard rankings..." 
+            showMessage={true} 
+          />
+        )}
         
-        {!loading && !error && (
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-center">
+            <p>{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+        
+        {!loading && !error && users.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No users found on the leaderboard yet.</p>
+          </div>
+        )}
+        
+        {!loading && !error && users.length > 0 && (
           <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div className="bg-primary text-white px-6 py-4">
+              <h2 className="text-xl font-bold">Top Wandrrs</h2>
+              <p className="text-green-100">See how you rank against other travelers!</p>
+            </div>
             <ul className="divide-y divide-gray-200">
-              {users.map((user, index) => (
-                <li key={user.id} className="p-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <span className="text-lg font-bold text-gray-600 w-10">{index + 1}</span>
-                    <span className="font-semibold text-gray-800">{user.username}</span>
-                  </div>
-                  <div className="text-lg font-bold text-primary">{user.xp} XP</div>
-                </li>
-              ))}
+              {users.map((user, index) => {
+                const isCurrentUser = user.id === userId;
+                const rankColor = index === 0 ? 'text-yellow-500' : index === 1 ? 'text-gray-400' : index === 2 ? 'text-yellow-600' : 'text-gray-600';
+                const rankIcon = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+                
+                return (
+                  <li 
+                    key={user.id} 
+                    className={`p-4 flex items-center justify-between transition-colors ${
+                      isCurrentUser ? 'bg-green-50 border-l-4 border-primary' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-lg font-bold w-8 text-center ${rankColor}`}>
+                          {index < 3 ? rankIcon : `#${index + 1}`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className={`font-semibold ${
+                          isCurrentUser ? 'text-primary' : 'text-gray-800'
+                        }`}>
+                          {user.username}
+                          {isCurrentUser && <span className="ml-2 text-sm text-primary">(You)</span>}
+                        </span>
+                        {user.streak > 0 && (
+                          <div className="text-sm text-gray-500">
+                            🔥 {user.streak} day streak
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-primary">{user.xp || 0} XP</div>
+                      <div className="text-sm text-gray-500">Level {Math.floor((user.xp || 0) / 50)}</div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

@@ -4,7 +4,8 @@ import { useRouter } from 'next/router';
 import { jwtDecode } from 'jwt-decode';
 import UserStats from '../components/UserStats';
 import LessonCard from '../components/LessonCard';
-import ProgressBar from '../components/ProgressBar';
+import { LoadingBar, LoadingSpinner, LoadingOverlay, useLoadingProgress } from '../components/ProgressBar';
+import { fetchUserWithCache, setCachedUser, clearUserCache } from '../lib/userCache';
 
 // --- Reusable UI Components ---
 
@@ -27,16 +28,29 @@ const CustomLessonGenerator = ({ onGenerate, isGenerating, customTopic, setCusto
         value={customTopic}
         onChange={(e) => setCustomTopic(e.target.value)}
         placeholder="Enter a topic..."
-        className="flex-grow px-4 py-2 border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+        disabled={isGenerating}
+        className="flex-grow px-4 py-2 border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
       />
       <button 
         onClick={onGenerate}
-        disabled={isGenerating}
-        className="px-6 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 disabled:bg-gray-400 transition-all duration-200"
+        disabled={isGenerating || !customTopic.trim()}
+        className="px-6 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-2"
       >
-        {isGenerating ? 'Generating...' : 'Generate'}
+        {isGenerating ? (
+          <>
+            <LoadingSpinner size="sm" />
+            <span>Generating...</span>
+          </>
+        ) : (
+          <span>Generate</span>
+        )}
       </button>
     </div>
+    {isGenerating && (
+      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+        <LoadingSpinner size="sm" message="Creating your personalized lesson..." />
+      </div>
+    )}
   </div>
 );
 
@@ -85,12 +99,34 @@ export default function Home() {
   const [customLessonCompleted, setCustomLessonCompleted] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [newLevel, setNewLevel] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('Loading...');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Initialize loading progress hook
+  const loadingSteps = [
+    'Authenticating user...',
+    'Fetching user profile...',
+    'Loading today\'s lesson...',
+    'Preparing content...'
+  ];
+  
+  const {
+    isLoading: progressLoading,
+    progress,
+    message: progressMessage,
+    startLoading,
+    nextStep,
+    finishLoading,
+    resetLoading
+  } = useLoadingProgress(loadingSteps);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) router.push('/auth');
-    else {
+    if (!token) {
+      router.push('/auth');
+    } else {
       try {
+        setLoadingMessage('Verifying authentication...');
         const decodedToken = jwtDecode(token);
         setUserId(decodedToken.userId);
       } catch (err) {
@@ -102,36 +138,76 @@ export default function Home() {
 
   useEffect(() => {
     if (!userId) return;
+    
     async function fetchData() {
+      startLoading(loadingSteps);
       setLoading(true);
+      setError(null);
+      
       try {
-        const userRes = await fetch(`/api/user/${userId}`);
-        if (!userRes.ok) throw new Error('Failed to fetch user');
-        const userData = await userRes.json();
+        // Step 1: Fetch user profile (with caching)
+        nextStep(loadingSteps);
+        const userData = await fetchUserWithCache(userId, true);
         setUser(userData);
+        
+        // Step 2: Fetch today's lesson
+        nextStep(loadingSteps);
         const lessonRes = await fetch(`/api/lesson/today/${userId}`);
-        if (!lessonRes.ok) throw new Error('Failed to fetch lesson');
-        setLesson(await lessonRes.json());
-      } catch (err) { setError(err.message); } 
-      finally { setLoading(false); }
+        if (!lessonRes.ok) {
+          if (lessonRes.status === 503) {
+            throw new Error('Lesson service is temporarily busy. Please try again in a moment.');
+          }
+          throw new Error('Failed to fetch today\'s lesson');
+        }
+        const lessonData = await lessonRes.json();
+        setLesson(lessonData);
+        
+        // Step 3: Finalize
+        nextStep(loadingSteps);
+        await new Promise(resolve => setTimeout(resolve, 300)); // Brief pause for UX
+        
+        finishLoading();
+      } catch (err) {
+        setError(err.message);
+        resetLoading();
+      } finally {
+        setLoading(false);
+      }
     }
+    
     fetchData();
   }, [userId]);
 
   const handleLessonSubmit = async (answer, isCorrect) => {
     if (!lesson || !user) return;
+    
+    setIsSubmitting(true);
+    setError(null);
+    
     try {
       const oldLevel = Math.floor((user.xp || 0) / 50);
 
-      const response = await fetch('/api/lesson/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user, lesson, answer }) });
+      const response = await fetch('/api/lesson/submit', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ user, lesson, answer }) 
+      });
+      
       if (!response.ok) {
+        if (response.status === 503) {
+          throw new Error('Service is temporarily busy. Your answer will be saved when service is available.');
+        }
         const errorText = await response.text();
         throw new Error(`Submit failed: ${response.status} ${errorText}`);
       }
+      
       const result = await response.json();
       
       if (result.updatedUser) {
+        // Update local state and cache with fresh user data
         setUser(result.updatedUser);
+        setCachedUser(userId, result.updatedUser); // Update cache
+        
         const newLevel = Math.floor((result.updatedUser.xp || 0) / 50);
         if (newLevel > oldLevel) {
           setNewLevel(newLevel);
@@ -139,41 +215,75 @@ export default function Home() {
         }
       }
 
+      // Show brief success message then load next content
       setTimeout(async () => {
         if (lesson.isCustom) {
           setLesson(null);
           setCustomLessonCompleted(true);
         } else {
+          setLoadingMessage('Loading next lesson...');
           setLoading(true);
           try {
             const lessonRes = await fetch(`/api/lesson/today/${userId}`);
-            if (!lessonRes.ok) throw new Error('Failed to fetch next lesson');
+            if (!lessonRes.ok) {
+              if (lessonRes.status === 503) {
+                throw new Error('Service is temporarily busy. Please try again in a moment.');
+              }
+              throw new Error('Failed to fetch next lesson');
+            }
             setLesson(await lessonRes.json());
-          } catch (err) { setError(err.message); } 
-          finally { setLoading(false); }
+          } catch (err) { 
+            setError(err.message); 
+          } finally { 
+            setLoading(false); 
+          }
         }
       }, 2000);
-    } catch (error) { setError(`Failed to submit lesson: ${error.message}`); }
+    } catch (error) { 
+      setError(`Failed to submit lesson: ${error.message}`); 
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCustomGenerate = async () => {
     if (!customTopic.trim() || !user) return setError('Please enter a topic.');
+    
     setIsGenerating(true);
     setError(null);
     setCustomLessonCompleted(false);
+    
     try {
-      const response = await fetch('/api/lesson/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: customTopic, user }) });
+      const response = await fetch('/api/lesson/generate', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ prompt: customTopic, user }) 
+      });
+      
       if (!response.ok) {
         const errorData = await response.json();
+        if (response.status === 503) {
+          throw new Error('AI service is temporarily busy. Please try again in a moment.');
+        }
         throw new Error(errorData.message || 'Failed to generate lesson.');
       }
-      setLesson(await response.json());
+      
+      const lessonData = await response.json();
+      setLesson(lessonData);
       setShowCustom(false);
-    } catch (err) { setError(err.message); } 
-    finally { setIsGenerating(false); }
+      setCustomTopic(''); // Clear the input
+    } catch (err) { 
+      setError(err.message); 
+    } finally { 
+      setIsGenerating(false); 
+    }
   };
 
-  if (!userId) return <ProgressBar />;
+  if (!userId) return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <LoadingBar message="Initializing application..." showMessage={true} />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans">
@@ -185,7 +295,16 @@ export default function Home() {
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-primary">Wandrr</h1>
-          <button onClick={() => { localStorage.removeItem('token'); router.push('/auth'); }} className="text-sm text-gray-600 hover:text-gray-800">Logout</button>
+          <button 
+            onClick={() => { 
+              clearUserCache(userId); // Clear user cache on logout
+              localStorage.removeItem('token'); 
+              router.push('/auth'); 
+            }} 
+            className="text-sm text-gray-600 hover:text-gray-800"
+          >
+            Logout
+          </button>
         </div>
       </header>
 
@@ -194,16 +313,32 @@ export default function Home() {
         {user && <UserStats user={user} />}
         
         <div className="mt-8">
-          {loading && <ProgressBar />}
-          {!loading && lesson && (
-            <LessonCard 
-              lesson={lesson} 
-              onSubmit={handleLessonSubmit} 
-              onNextCustom={handleCustomGenerate}
-              customTopic={customTopic}
+          {(loading || progressLoading) && (
+            <LoadingBar 
+              message={progressLoading ? progressMessage : loadingMessage} 
+              progress={progressLoading ? progress : null}
+              showMessage={true} 
             />
           )}
-          {!loading && !lesson && (
+          
+          {!loading && !progressLoading && lesson && (
+            <>
+              <LessonCard 
+                lesson={lesson} 
+                onSubmit={handleLessonSubmit} 
+                onNextCustom={handleCustomGenerate}
+                customTopic={customTopic}
+                disabled={isSubmitting}
+              />
+              {isSubmitting && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <LoadingSpinner size="sm" message="Submitting your answer..." className="justify-center" />
+                </div>
+              )}
+            </>
+          )}
+          
+          {!loading && !progressLoading && !lesson && (
             customLessonCompleted ? (
               <CompletionCard 
                 title="Lesson Complete!" 
@@ -222,13 +357,21 @@ export default function Home() {
 
         {showCustom && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20 p-4">
-            <CustomLessonGenerator 
-              onGenerate={handleCustomGenerate} 
-              isGenerating={isGenerating} 
-              customTopic={customTopic} 
-              setCustomTopic={setCustomTopic} 
-            />
-            <button onClick={() => setShowCustom(false)} className="absolute top-4 right-4 text-white text-4xl font-thin">&times;</button>
+            <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full relative">
+              <button 
+                onClick={() => setShowCustom(false)} 
+                disabled={isGenerating}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-thin disabled:cursor-not-allowed"
+              >
+                &times;
+              </button>
+              <CustomLessonGenerator 
+                onGenerate={handleCustomGenerate} 
+                isGenerating={isGenerating} 
+                customTopic={customTopic} 
+                setCustomTopic={setCustomTopic} 
+              />
+            </div>
           </div>
         )}
 

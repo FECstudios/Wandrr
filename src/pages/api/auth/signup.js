@@ -19,31 +19,56 @@ export default async function handler(req, res) {
   });
 
   try {
-    // --- Retry Logic for checking existing user ---
+    // --- Enhanced Retry Logic for checking existing user ---
     let existingUserResults;
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 5; // Increased max attempts
+    const baseDelay = 1000; // Base delay of 1 second
 
     while (attempts < maxAttempts) {
       try {
         attempts++;
-        console.log(`[Signup API] Checking for existing user... (Attempt ${attempts})`);
+        console.log(`[Signup API] Checking for existing user... (Attempt ${attempts}/${maxAttempts})`);
+        
         existingUserResults = await shov.search('user', { 
           collection: 'users', 
           filters: { email },
           limit: 1
         });
+        
         console.log(`[Signup API] Attempt ${attempts} successful.`);
         break; // Success, exit loop
+        
       } catch (error) {
         console.error(`[Signup API] Attempt ${attempts} to check user failed:`, error.message);
+        
+        // Check if it's a capacity/rate limit error
+        const isRateLimitError = error.message.includes('Capacity temporarily exceeded') || 
+                               error.message.includes('rate limit') ||
+                               error.message.includes('3040');
+        
         if (attempts >= maxAttempts) {
-          throw new Error(`Failed to check for existing user after ${maxAttempts} attempts: ${error.message}`);
+          if (isRateLimitError) {
+            console.error(`[Signup API] Rate limit exceeded after ${maxAttempts} attempts. Service temporarily unavailable.`);
+            return res.status(503).json({ 
+              message: 'Service temporarily unavailable due to high demand. Please try again in a moment.',
+              retryAfter: 30
+            });
+          } else {
+            throw new Error(`Failed to check for existing user after ${maxAttempts} attempts: ${error.message}`);
+          }
         }
-        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Calculate exponential backoff delay with jitter for rate limiting
+        const delay = isRateLimitError 
+          ? baseDelay * Math.pow(3, attempts - 1) + Math.random() * 1000 // Longer delay for rate limits
+          : baseDelay * Math.pow(2, attempts - 1); // Standard exponential backoff
+        
+        console.log(`[Signup API] Waiting ${Math.round(delay)}ms before retry attempt...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-    // --- End Retry Logic ---
+    // --- End Enhanced Retry Logic ---
 
     const existingUser = existingUserResults?.items?.[0]?.value;
 
@@ -71,6 +96,22 @@ export default async function handler(req, res) {
     res.status(201).json({ message: 'User registered successfully.', userId: newUser.id });
   } catch (error) {
     console.error('Error during signup:', error);
+    
+    // Handle specific error types
+    if (error.message.includes('Service temporarily unavailable')) {
+      // This error was already handled in the retry logic
+      return;
+    }
+    
+    if (error.message.includes('Capacity temporarily exceeded') || 
+        error.message.includes('rate limit') ||
+        error.message.includes('3040')) {
+      return res.status(503).json({ 
+        message: 'Service temporarily unavailable due to high demand. Please try again in a moment.',
+        retryAfter: 30
+      });
+    }
+    
     res.status(500).json({ message: 'Internal Server Error' });
   }
 }
