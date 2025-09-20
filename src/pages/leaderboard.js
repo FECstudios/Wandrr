@@ -4,16 +4,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { jwtDecode } from 'jwt-decode';
 import { LoadingBar, LoadingSpinner } from '../components/ProgressBar';
+import { getStorageItem, removeStorageItem, isClient } from '../lib/clientStorage';
 
 export default function Leaderboard() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [isTokenChecked, setIsTokenChecked] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    // Only check token on client side to avoid SSR issues
+    if (!isClient()) return;
+    
+    const token = getStorageItem('token');
     if (!token) {
       router.push('/auth');
       return;
@@ -24,14 +29,16 @@ export default function Leaderboard() {
       setUserId(decodedToken.userId);
     } catch (err) {
       console.error('Invalid token:', err);
-      localStorage.removeItem('token');
+      removeStorageItem('token');
       router.push('/auth');
       return;
     }
+    
+    setIsTokenChecked(true);
   }, [router]);
 
   useEffect(() => {
-    if (!userId) return; // Wait for userId to be set from token
+    if (!userId || !isTokenChecked) return; // Wait for userId to be set from token
 
     async function fetchLeaderboard() {
       setLoading(true);
@@ -55,12 +62,20 @@ export default function Leaderboard() {
     }
     
     fetchLeaderboard();
-  }, [userId]);
+  }, [userId, isTokenChecked]);
 
+  if (!isTokenChecked) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingBar message="Initializing..." showMessage={true} />
+      </div>
+    );
+  }
+  
   if (!userId) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingBar message="Loading leaderboard..." showMessage={true} />
+        <LoadingBar message="Redirecting to login..." showMessage={true} />
       </div>
     );
   }
@@ -80,7 +95,7 @@ export default function Leaderboard() {
             </Link>
             <button 
               onClick={() => {
-                localStorage.removeItem('token');
+                removeStorageItem('token');
                 router.push('/auth');
               }}
               className="text-sm text-gray-600 hover:text-gray-800"

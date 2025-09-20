@@ -6,6 +6,7 @@ import UserStats from '../components/UserStats';
 import LessonCard from '../components/LessonCard';
 import { LoadingBar, LoadingSpinner, LoadingOverlay, useLoadingProgress } from '../components/ProgressBar';
 import { fetchUserWithCache, setCachedUser, clearUserCache } from '../lib/userCache';
+import { getStorageItem, setStorageItem, removeStorageItem, isClient } from '../lib/clientStorage';
 
 // --- Reusable UI Components ---
 
@@ -101,6 +102,7 @@ export default function Home() {
   const [newLevel, setNewLevel] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTokenChecked, setIsTokenChecked] = useState(false); // Track if token check is complete
 
   // Initialize loading progress hook
   const loadingSteps = [
@@ -121,7 +123,10 @@ export default function Home() {
   } = useLoadingProgress(loadingSteps);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    // Only check token on client side to avoid SSR issues
+    if (!isClient()) return;
+    
+    const token = getStorageItem('token');
     if (!token) {
       router.push('/auth');
     } else {
@@ -130,14 +135,16 @@ export default function Home() {
         const decodedToken = jwtDecode(token);
         setUserId(decodedToken.userId);
       } catch (err) {
-        localStorage.removeItem('token');
+        console.error('Invalid token:', err);
+        removeStorageItem('token');
         router.push('/auth');
       }
     }
+    setIsTokenChecked(true);
   }, [router]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !isTokenChecked) return;
     
     async function fetchData() {
       startLoading(loadingSteps);
@@ -176,7 +183,7 @@ export default function Home() {
     }
     
     fetchData();
-  }, [userId]);
+  }, [userId, isTokenChecked]);
 
   const handleLessonSubmit = async (answer, isCorrect) => {
     if (!lesson || !user) return;
@@ -279,11 +286,21 @@ export default function Home() {
     }
   };
 
-  if (!userId) return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <LoadingBar message="Initializing application..." showMessage={true} />
-    </div>
-  );
+  if (!isTokenChecked) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <LoadingBar message="Initializing application..." showMessage={true} />
+      </div>
+    );
+  }
+  
+  if (!userId) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <LoadingBar message="Redirecting to login..." showMessage={true} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans">
@@ -298,7 +315,7 @@ export default function Home() {
           <button 
             onClick={() => { 
               clearUserCache(userId); // Clear user cache on logout
-              localStorage.removeItem('token'); 
+              removeStorageItem('token'); 
               router.push('/auth'); 
             }} 
             className="text-sm text-gray-600 hover:text-gray-800"

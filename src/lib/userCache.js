@@ -1,10 +1,26 @@
 /**
  * User caching utilities to reduce redundant API calls
  * Implements client-side caching for user data including Shov IDs
+ * SSR-safe implementation
  */
 
-// In-memory cache for user data (client-side)
-const userCache = new Map();
+import { isClient } from './clientStorage';
+
+// In-memory cache for user data (client-side only)
+let userCache;
+if (isClient()) {
+  userCache = new Map();
+} else {
+  userCache = {
+    get: () => null,
+    set: () => {},
+    delete: () => {},
+    clear: () => {},
+    size: 0,
+    entries: () => []
+  };
+}
+
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -182,7 +198,7 @@ export async function fetchUserWithCache(userId, useCache = true) {
 }
 
 // Auto-cleanup expired cache entries every 5 minutes
-if (typeof window !== 'undefined') {
+if (isClient()) {
   setInterval(() => {
     const stats = getCacheStats();
     if (stats.expired > 0) {

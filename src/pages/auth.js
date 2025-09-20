@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { LoadingSpinner } from '../components/ProgressBar';
+import { setStorageItem } from '../lib/clientStorage';
 
 export default function AuthPage() {
   const [email, setEmail] = useState('');
@@ -35,7 +36,7 @@ export default function AuthPage() {
       }
 
       if (isLogin) {
-        localStorage.setItem('token', data.token);
+        setStorageItem('token', data.token);
         router.push('/'); // Redirect to home page
       } else {
         alert(data.message); // Show success message for signup
