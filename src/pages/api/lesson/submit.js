@@ -1,8 +1,14 @@
 import { Shov } from 'shov-js';
 
 export default async function handler(req, res) {
-  console.log('=== SUBMIT API ENDPOINT HIT (CORRECTED) ===');
-  console.log('Body:', req.body);
+  console.log('=== SUBMIT API ENDPOINT HIT ===');
+  console.log('Request body structure:', {
+    hasUser: !!req.body?.user,
+    hasLesson: !!req.body?.lesson,
+    hasAnswer: req.body?.answer !== undefined,
+    userShovId: req.body?.user?.shovId,
+    lessonShovId: req.body?.lesson?.shovId
+  });
   
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
@@ -13,8 +19,20 @@ export default async function handler(req, res) {
   const userShovId = user?.shovId; // Try to get cached Shov ID first
 
   if (!userId || !lesson || !lesson.shovId || answer === undefined) {
-    return res.status(400).json({ message: 'Missing required fields: user object, lesson object, answer' });
+    const missingFields = [];
+    if (!userId) missingFields.push('user.id');
+    if (!lesson) missingFields.push('lesson object');
+    else if (!lesson.shovId) missingFields.push('lesson.shovId');
+    if (answer === undefined) missingFields.push('answer');
+    
+    console.error('Validation failed. Missing fields:', missingFields);
+    return res.status(400).json({ 
+      message: `Missing required fields: ${missingFields.join(', ')}`,
+      missingFields
+    });
   }
+  
+  console.log('Validation passed. Processing submission...');
 
   const shov = new Shov({
     projectName: process.env.SHOV_PROJECT,
@@ -92,7 +110,14 @@ export default async function handler(req, res) {
 
     const isCorrect = String(lesson.answer) === String(answer);
     let updatedUser = { ...user };
-    const lessonIdForTracking = lesson.shovId;
+    
+    // Handle temporary shovIds by using the lesson's own ID for tracking
+    const lessonIdForTracking = lesson.shovId?.startsWith('temp-') || lesson.shovId?.startsWith('emergency-') 
+      ? lesson.id 
+      : lesson.shovId;
+    
+    console.log('Using lesson ID for tracking:', lessonIdForTracking);
+    console.log('Lesson shovId type:', lesson.shovId?.startsWith('temp-') ? 'temporary' : lesson.shovId?.startsWith('emergency-') ? 'emergency' : 'normal');
 
     if (isCorrect) {
       updatedUser.xp = (user.xp || 0) + (lesson.xp || 10);

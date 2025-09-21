@@ -144,14 +144,39 @@ Create your lesson now:`;
     };
 
     console.log('Lesson object to be added to Shov:', lessonWithId);
-    const addResult = await shov.add('lessons', lessonWithId);
-    console.log('Shov add result:', addResult);
-    console.log('Lesson successfully added to Shov.');
-
-    // Store Shov's internal ID for reliable retrieval
-    const shovAssignedId = addResult?.id; 
-    if (shovAssignedId) {
-      lessonWithId.shovId = shovAssignedId;
+    
+    try {
+      const addResult = await shov.add('lessons', lessonWithId);
+      console.log('Shov add result:', addResult);
+      
+      // Store Shov's internal ID for reliable retrieval
+      // Handle different response formats from Shov API
+      const shovAssignedId = addResult?.id || addResult?.data?.id || addResult?._id; 
+      if (!shovAssignedId && addResult?.success !== true) {
+        throw new Error('Failed to get Shov ID for AI-generated lesson');
+      }
+      
+      if (shovAssignedId) {
+        lessonWithId.shovId = shovAssignedId;
+        console.log('Lesson successfully added to Shov with ID:', shovAssignedId);
+      } else if (addResult?.success === true) {
+        // Shov returned success but no explicit ID, generate fallback
+        lessonWithId.shovId = `temp-${lessonWithId.id}`;
+        console.log('Shov success but no ID returned, using temporary shovId:', lessonWithId.shovId);
+      }
+      
+    } catch (addError) {
+      console.error('Failed to add AI lesson to Shov:', addError);
+      
+      // Generate a temporary ID as fallback
+      lessonWithId.shovId = `temp-${lessonWithId.id}`;
+      console.warn('Using temporary shovId for AI lesson:', lessonWithId.shovId);
+    }
+    
+    // Ensure shovId is always present
+    if (!lessonWithId.shovId) {
+      lessonWithId.shovId = `emergency-${lessonWithId.id}`;
+      console.warn('Emergency shovId assigned to AI lesson:', lessonWithId.shovId);
     }
 
     return lessonWithId;
@@ -198,14 +223,41 @@ Create your lesson now:`;
     };
     
     console.log('Fallback lesson object to be added to Shov:', fallback);
-    const addResult = await shov.add('lessons', fallback);
-    console.log('Shov add result:', addResult);
-    console.log('Fallback lesson successfully added to Shov.');
-
-    const shovAssignedId = addResult?.id; 
-    if (shovAssignedId) {
-      fallback.shovId = shovAssignedId;
+    
+    try {
+      const addResult = await shov.add('lessons', fallback);
+      console.log('Shov add result:', addResult);
+      
+      // Handle different response formats from Shov API
+      const shovAssignedId = addResult?.id || addResult?.data?.id || addResult?._id; 
+      if (!shovAssignedId && addResult?.success !== true) {
+        throw new Error('Failed to get Shov ID for fallback lesson');
+      }
+      
+      if (shovAssignedId) {
+        fallback.shovId = shovAssignedId;
+        console.log('Fallback lesson successfully added to Shov with ID:', shovAssignedId);
+      } else if (addResult?.success === true) {
+        // Shov returned success but no explicit ID, generate fallback
+        fallback.shovId = `temp-${fallback.id}`;
+        console.log('Shov success but no ID returned, using temporary shovId for fallback:', fallback.shovId);
+      }
+      
+    } catch (addError) {
+      console.error('Failed to add fallback lesson to Shov:', addError);
+      
+      // Generate a temporary ID as last resort to prevent submission failure
+      // This allows the lesson to work even if Shov is temporarily unavailable
+      fallback.shovId = `temp-${fallback.id}`;
+      console.warn('Using temporary shovId as fallback:', fallback.shovId);
     }
+    
+    // Ensure shovId is always present before returning
+    if (!fallback.shovId) {
+      fallback.shovId = `emergency-${fallback.id}`;
+      console.warn('Emergency shovId assigned:', fallback.shovId);
+    }
+    
     return fallback;
   }
 }

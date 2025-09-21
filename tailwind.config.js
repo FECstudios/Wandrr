@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -8,7 +9,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: '#10B981',
+        primary: 'var(--primary)',
         secondary: '#3B82F6',
       },
       animation: {

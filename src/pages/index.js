@@ -2,27 +2,29 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { jwtDecode } from 'jwt-decode';
+import useSound from 'use-sound';
 import UserStats from '../components/UserStats';
 import LessonCard from '../components/LessonCard';
 import { LoadingBar, LoadingSpinner, LoadingOverlay, useLoadingProgress } from '../components/ProgressBar';
 import { fetchUserWithCache, setCachedUser, clearUserCache } from '../lib/userCache';
 import { getStorageItem, setStorageItem, removeStorageItem, isClient } from '../lib/clientStorage';
+import Button from '../components/Button';
 
 // --- Reusable UI Components ---
 
 const ErrorAlert = ({ message, onClose }) => (
   <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative shadow-md my-4 animate-fade-in" role="alert">
     <span className="block sm:inline">{message}</span>
-    <button onClick={onClose} className="absolute top-0 bottom-0 right-0 px-4 py-3">
+    <Button onClick={onClose} className="absolute top-0 bottom-0 right-0 px-4 py-3">
       <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
-    </button>
+    </Button>
   </div>
 );
 
 const CustomLessonGenerator = ({ onGenerate, isGenerating, customTopic, setCustomTopic }) => (
-  <div className="mt-4 p-6 bg-white rounded-2xl shadow-lg border border-gray-200 animate-fade-in-fast">
-    <h3 className="text-xl font-bold text-gray-800 mb-2">Generate a Custom Lesson</h3>
-    <p className="text-sm text-gray-500 mb-4">What do you want to learn about? Enter a topic and country, e.g., "Tipping in the USA" or "French pastries".</p>
+  <div className="mt-4 p-6 bg-background rounded-2xl shadow-lg border border-foreground/10 animate-fade-in-fast">
+    <h3 className="text-xl font-bold text-foreground mb-2">Generate a Custom Lesson</h3>
+    <p className="text-sm text-foreground/60 mb-4">What do you want to learn about? Enter a topic and country, e.g., "Tipping in the USA" or "French pastries".</p>
     <div className="flex flex-col sm:flex-row gap-2">
       <input 
         type="text"
@@ -30,9 +32,9 @@ const CustomLessonGenerator = ({ onGenerate, isGenerating, customTopic, setCusto
         onChange={(e) => setCustomTopic(e.target.value)}
         placeholder="Enter a topic..."
         disabled={isGenerating}
-        className="flex-grow px-4 py-2 border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="flex-grow px-4 py-2 bg-background border-foreground/10 rounded-lg shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
       />
-      <button 
+      <Button 
         onClick={onGenerate}
         disabled={isGenerating || !customTopic.trim()}
         className="px-6 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-2"
@@ -45,7 +47,7 @@ const CustomLessonGenerator = ({ onGenerate, isGenerating, customTopic, setCusto
         ) : (
           <span>Generate</span>
         )}
-      </button>
+      </Button>
     </div>
     {isGenerating && (
       <div className="mt-4 p-3 bg-blue-50 rounded-lg">
@@ -56,30 +58,30 @@ const CustomLessonGenerator = ({ onGenerate, isGenerating, customTopic, setCusto
 );
 
 const CompletionCard = ({ onGenerateClick, message, title }) => (
-  <div className="text-center text-gray-600 mt-10 p-8 bg-white rounded-2xl shadow-lg border border-gray-200 animate-fade-in">
+  <div className="text-center text-foreground/80 mt-10 p-8 bg-background rounded-2xl shadow-lg border border-foreground/10 animate-fade-in">
       <h3 className="text-2xl font-bold text-primary mb-2">{title}</h3>
       <p className="mb-6">{message}</p>
-      <button 
+      <Button 
         onClick={onGenerateClick}
         className="px-6 py-3 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition-all duration-200 transform hover:scale-105"
       >
         Learn Something New
-      </button>
+      </Button>
   </div>
 );
 
 const LevelUpModal = ({ newLevel, onClose }) => (
   <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 animate-fade-in-fast">
-    <div className="bg-white rounded-2xl shadow-2xl p-8 text-center max-w-sm mx-auto transform scale-100 animate-pop-in">
+    <div className="bg-background rounded-2xl shadow-2xl p-8 text-center max-w-sm mx-auto transform scale-100 animate-pop-in">
       <h2 className="text-4xl font-bold text-yellow-500 mb-4">LEVEL UP!</h2>
-      <p className="text-xl text-gray-700 mb-2">You've reached</p>
+      <p className="text-xl text-foreground/80 mb-2">You've reached</p>
       <p className="text-6xl font-bold text-primary mb-6">Level {newLevel}</p>
-      <button 
+      <Button 
         onClick={onClose}
         className="px-8 py-3 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition-all duration-200 transform hover:scale-105"
       >
         Keep Going!
-      </button>
+      </Button>
     </div>
   </div>
 );
@@ -103,6 +105,9 @@ export default function Home() {
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTokenChecked, setIsTokenChecked] = useState(false); // Track if token check is complete
+  const [playLevelUp] = useSound('/audio/levelup.mp3');
+  const [playCorrect] = useSound('/audio/correct.mp3');
+  const [playIncorrect] = useSound('/audio/incorrect.mp3');
 
   // Initialize loading progress hook
   const loadingSteps = [
@@ -186,7 +191,30 @@ export default function Home() {
   }, [userId, isTokenChecked]);
 
   const handleLessonSubmit = async (answer, isCorrect) => {
-    if (!lesson || !user) return;
+    if (!lesson || !user) {
+      console.error('Missing lesson or user data:', { lesson: !!lesson, user: !!user });
+      setError('Missing lesson or user data. Please refresh the page.');
+      return;
+    }
+
+    // Additional validation before submission
+    if (!lesson.shovId) {
+      console.error('Lesson missing shovId:', lesson);
+      setError('Lesson data is incomplete. Please refresh the page.');
+      return;
+    }
+
+    if (answer === undefined || answer === null || answer === '') {
+      console.error('Answer is missing or empty:', { answer, type: typeof answer });
+      setError('Please select an answer before submitting.');
+      return;
+    }
+
+    if (isCorrect) {
+      playCorrect();
+    } else {
+      playIncorrect();
+    }
     
     setIsSubmitting(true);
     setError(null);
@@ -219,6 +247,7 @@ export default function Home() {
         if (newLevel > oldLevel) {
           setNewLevel(newLevel);
           setShowLevelUp(true);
+          playLevelUp();
         }
       }
 
@@ -288,54 +317,101 @@ export default function Home() {
 
   if (!isTokenChecked) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <LoadingBar message="Initializing application..." showMessage={true} />
+      <div className="min-h-screen wandrr-pattern flex items-center justify-center">
+        <div className="glass-card rounded-2xl p-8">
+          <LoadingBar message="Initializing application..." showMessage={true} />
+        </div>
       </div>
     );
   }
   
   if (!userId) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <LoadingBar message="Redirecting to login..." showMessage={true} />
+      <div className="min-h-screen wandrr-pattern flex items-center justify-center">
+        <div className="glass-card rounded-2xl p-8">
+          <LoadingBar message="Redirecting to login..." showMessage={true} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans">
+    <div className="min-h-screen premium-background font-sans">
       <Head>
-        <title>Wandrr - Travel Smarter</title>
+        <title>Wandrr - Master Global Cultures</title>
         <link rel="icon" href="/favicon.ico" />
+        <meta name="description" content="Learn cultural customs and etiquette from around the world through AI-powered lessons" />
       </Head>
 
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-primary">Wandrr</h1>
-          <button 
-            onClick={() => { 
-              clearUserCache(userId); // Clear user cache on logout
-              removeStorageItem('token'); 
-              router.push('/auth'); 
-            }} 
-            className="text-sm text-gray-600 hover:text-gray-800"
-          >
-            Logout
-          </button>
+      <header className="premium-glass-header sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-6 sm:px-8 lg:px-12 py-6 flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <div className="premium-logo-container">
+              <div className="text-4xl floating">🌍</div>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Wandrr</h1>
+              <p className="text-gray-600 text-sm font-medium">Master Global Cultures</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-6">
+            <div className="hidden md:flex items-center text-gray-600 text-sm">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+              <span>Learning in progress</span>
+            </div>
+            <Button 
+              onClick={() => { 
+                clearUserCache(userId);
+                removeStorageItem('token'); 
+                router.push('/auth'); 
+              }} 
+              className="premium-button-secondary"
+            >
+              <span>👋</span>
+              <span>Sign Out</span>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto p-4 sm:px-6 lg:px-8 py-8">
-        {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
-        {user && <UserStats user={user} />}
+      <main className="max-w-6xl mx-auto px-6 sm:px-8 lg:px-12 py-12">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold text-gray-800 mb-4">Your Cultural Journey</h2>
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto">Discover customs, traditions, and etiquette from around the world through interactive lessons</p>
+        </div>
         
-        <div className="mt-8">
+        {error && (
+          <div className="premium-error-card mb-8">
+            <div className="flex items-center space-x-3">
+              <div className="text-2xl">⚠️</div>
+              <div>
+                <h3 className="font-semibold text-red-800">Oops! Something went wrong</h3>
+                <p className="text-red-600">{error}</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setError(null)}
+              className="ml-auto text-red-400 hover:text-red-600 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        
+        {user && (
+          <div className="premium-stats-grid mb-12">
+            <UserStats user={user} />
+          </div>
+        )}
+        <div className="lesson-container">
           {(loading || progressLoading) && (
-            <LoadingBar 
-              message={progressLoading ? progressMessage : loadingMessage} 
-              progress={progressLoading ? progress : null}
-              showMessage={true} 
-            />
+            <div className="premium-loading-card">
+              <LoadingBar 
+                message={progressLoading ? progressMessage : loadingMessage} 
+                progress={progressLoading ? progress : null}
+                showMessage={true} 
+              />
+            </div>
           )}
           
           {!loading && !progressLoading && lesson && (
@@ -348,58 +424,100 @@ export default function Home() {
                 disabled={isSubmitting}
               />
               {isSubmitting && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <LoadingSpinner size="sm" message="Submitting your answer..." className="justify-center" />
+                <div className="premium-submitting-indicator">
+                  <LoadingSpinner size="sm" message="Processing your answer..." className="justify-center text-gray-600" />
                 </div>
               )}
             </>
           )}
           
           {!loading && !progressLoading && !lesson && (
-            customLessonCompleted ? (
-              <CompletionCard 
-                title="Lesson Complete!" 
-                message="Ready for another challenge? Generate a new lesson on any topic you can imagine."
-                onGenerateClick={() => setShowCustom(true)}
-              />
-            ) : (
-              <CompletionCard 
-                title="All Done For Today!" 
-                message="You've completed your daily lessons. Come back tomorrow for more, or generate a custom lesson now."
-                onGenerateClick={() => setShowCustom(true)}
-              />
-            )
+            <div className="premium-completion-section">
+              {customLessonCompleted ? (
+                <div className="premium-completion-card">
+                  <div className="text-6xl mb-6">🎉</div>
+                  <h3 className="text-2xl font-bold text-gray-800 mb-4">Lesson Complete!</h3>
+                  <p className="text-gray-600 mb-8">Ready for another challenge? Generate a new lesson on any topic you can imagine.</p>
+                  <button 
+                    onClick={() => setShowCustom(true)}
+                    className="premium-button-primary"
+                  >
+                    🎆 Create New Lesson
+                  </button>
+                </div>
+              ) : (
+                <div className="premium-completion-card">
+                  <div className="text-6xl mb-6">✨</div>
+                  <h3 className="text-2xl font-bold text-gray-800 mb-4">All Done For Today!</h3>
+                  <p className="text-gray-600 mb-8">You've completed your daily lessons. Come back tomorrow for more, or generate a custom lesson now.</p>
+                  <button 
+                    onClick={() => setShowCustom(true)}
+                    className="premium-button-primary"
+                  >
+                    🚀 Explore More Topics
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
         {showCustom && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full relative">
+          <div className="premium-modal-overlay">
+            <div className="premium-modal-card">
               <button 
                 onClick={() => setShowCustom(false)} 
                 disabled={isGenerating}
-                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-thin disabled:cursor-not-allowed"
+                className="premium-close-button"
               >
-                &times;
+                ✕
               </button>
-              <CustomLessonGenerator 
-                onGenerate={handleCustomGenerate} 
-                isGenerating={isGenerating} 
-                customTopic={customTopic} 
-                setCustomTopic={setCustomTopic} 
-              />
+              <div className="text-center">
+                <div className="text-5xl mb-6">🎆</div>
+                <h3 className="text-2xl font-bold text-gray-800 mb-4">Create Custom Lesson</h3>
+                <p className="text-gray-600 mb-8">What cultural topic would you like to explore?</p>
+                
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    value={customTopic}
+                    onChange={(e) => setCustomTopic(e.target.value)}
+                    placeholder="e.g., Japanese tea ceremony, French dining etiquette..."
+                    className="premium-input"
+                    disabled={isGenerating}
+                  />
+                  <button
+                    onClick={handleCustomGenerate}
+                    disabled={!customTopic.trim() || isGenerating}
+                    className="premium-button-primary w-full"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        <span>Creating your lesson...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>✨</span>
+                        <span>Generate Lesson</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {!showCustom && !showLevelUp && (
-            <button 
-              onClick={() => setShowCustom(true)}
-              className="fixed bottom-8 right-8 w-16 h-16 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center text-4xl font-thin transform hover:scale-110 transition-transform duration-200 z-10"
-              aria-label="Generate Custom Lesson"
-            >
-              +
-            </button>
+          <button 
+            onClick={() => setShowCustom(true)}
+            className="premium-fab"
+            aria-label="Create Custom Lesson"
+          >
+            <div className="premium-fab-icon">✨</div>
+            <div className="premium-fab-text">Custom</div>
+          </button>
         )}
 
         {showLevelUp && <LevelUpModal newLevel={newLevel} onClose={() => setShowLevelUp(false)} />}
