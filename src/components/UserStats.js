@@ -1,13 +1,22 @@
 
 export default function UserStats({ user }) {
-  const xp = user.xp || 0;
+  // Use hardcoded data if user prop is not provided or is empty
+  const defaultUser = {
+    xp: 120, // Example XP
+    streak: 7, // Example streak
+    completed_lessons: [1, 2, 3, 4, 5], // Example completed lessons
+  };
+
+  const currentUser = user || defaultUser; // Use provided user or default
+
+  const xp = currentUser.xp || 0;
   const level = Math.floor(xp / 50);
   const progress = xp % 50;
-  const streak = user.streak || 0;
-  const completedLessons = user.completed_lessons?.length || 0;
+  const streak = currentUser.streak || 0;
+  const completedLessons = currentUser.completed_lessons?.length || 0;
 
   return (
-    <div className="premium-card max-w-2xl mx-auto p-6">
+    <div className="premium-card max-w-4xl mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-gray-800">Your Progress</h2>
         <div className="text-right">

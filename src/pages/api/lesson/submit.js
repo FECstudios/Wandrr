@@ -14,16 +14,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  const { user, lesson, answer } = req.body;
+  const { user, question, submittedAnswer, isCorrect } = req.body; // New parameters
   const userId = user?.id;
   const userShovId = user?.shovId; // Try to get cached Shov ID first
 
-  if (!userId || !lesson || !lesson.shovId || answer === undefined) {
+  if (!userId || !question || submittedAnswer === undefined || isCorrect === undefined) { // Updated validation
     const missingFields = [];
     if (!userId) missingFields.push('user.id');
-    if (!lesson) missingFields.push('lesson object');
-    else if (!lesson.shovId) missingFields.push('lesson.shovId');
-    if (answer === undefined) missingFields.push('answer');
+    if (!question) missingFields.push('question object');
+    if (submittedAnswer === undefined) missingFields.push('submittedAnswer');
+    if (isCorrect === undefined) missingFields.push('isCorrect');
     
     console.error('Validation failed. Missing fields:', missingFields);
     return res.status(400).json({ 
@@ -31,8 +31,6 @@ export default async function handler(req, res) {
       missingFields
     });
   }
-  
-  console.log('Validation passed. Processing submission...');
 
   const shov = new Shov({
     projectName: process.env.SHOV_PROJECT,
@@ -107,24 +105,22 @@ export default async function handler(req, res) {
       console.log(`[Submit API] Using cached Shov ID: ${finalUserShovId}`);
     }
 
-    const isCorrect = String(lesson.answer) === String(answer);
     let updatedUser = { ...user };
     
-    // Handle temporary shovIds by using the lesson's own ID for tracking
-    const lessonIdForTracking = lesson.shovId?.startsWith('temp-') || lesson.shovId?.startsWith('emergency-') 
-      ? lesson.id 
-      : lesson.shovId;
-    
-    console.log('Using lesson ID for tracking:', lessonIdForTracking);
-    console.log('Lesson shovId type:', lesson.shovId?.startsWith('temp-') ? 'temporary' : lesson.shovId?.startsWith('emergency-') ? 'emergency' : 'normal');
+    // Handle temporary shovIds by using the question's own ID for tracking
+    // Assuming question.id is unique enough for tracking individual questions
+    const questionIdForTracking = question.id; // Use question.id for tracking
+
+    console.log('Using question ID for tracking:', questionIdForTracking);
 
     if (isCorrect) {
-      updatedUser.xp = (user.xp || 0) + (lesson.xp || 10);
+      updatedUser.xp = (user.xp || 0) + (question.xp || 10); // Use question.xp
       updatedUser.streak = (user.streak || 0) + 1;
-      updatedUser.completed_lessons = [...(user.completed_lessons || []), lessonIdForTracking];
+      // We should track completed questions, not lessons, if XP is per question
+      updatedUser.completed_questions = [...(user.completed_questions || []), questionIdForTracking];
     } else {
       updatedUser.streak = 0;
-      updatedUser.mistakes = [...(user.mistakes || []), { lessonId: lessonIdForTracking, submittedAnswer: answer }];
+      updatedUser.mistakes = [...(user.mistakes || []), { questionId: questionIdForTracking, submittedAnswer: submittedAnswer }];
     }
 
     console.log(`Updating user ${finalUserShovId} with new data:`, updatedUser);
@@ -137,14 +133,14 @@ export default async function handler(req, res) {
     // Return updated user with cached Shov ID for future requests
     const responseData = { 
       correct: isCorrect, 
-      correctAnswer: lesson.answer, 
+      correctAnswer: question.answer, // Use question.answer
       updatedUser: { ...updatedUser, shovId: finalUserShovId } // Cache Shov ID
     };
     res.status(200).json(responseData);
 
   } catch (error) {
     console.error('=== ERROR IN SUBMIT API ===');
-    console.error('Error submitting lesson:', error.message);
+    console.error('Error submitting question:', error.message); // Changed message
     console.error('Stack trace:', error.stack);
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }

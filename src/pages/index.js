@@ -105,12 +105,15 @@ export default function Home() {
 
   const [showCustom, setShowCustom] = useState(false);
   const [customTopic, setCustomTopic] = useState('');
+  const [selectedQuestionType, setSelectedQuestionType] = useState('mix'); // 'mix', 'multiple_choice', 'true_false'
   const [isGenerating, setIsGenerating] = useState(false);
   const [customLessonCompleted, setCustomLessonCompleted] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [newLevel, setNewLevel] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lessonCompletedAndReadyToContinue, setLessonCompletedAndReadyToContinue] = useState(false);
+  const [lastCompletedLessonTopic, setLastCompletedLessonTopic] = useState(null); // New state
   const [isTokenChecked, setIsTokenChecked] = useState(false); // Track if token check is complete
   const [playLevelUp] = useSound('/audio/levelup.mp3');
   const [playCorrect] = useSound('/audio/correct.mp3');
@@ -223,7 +226,7 @@ export default function Home() {
     fetchData();
   }, [userId, isTokenChecked]);
 
-  const handleLessonSubmit = async (answer, isCorrect) => {
+  const handleLessonSubmit = async (question, submittedAnswer, isCorrect) => {
     if (!lesson || !user) {
       console.error('Missing lesson or user data:', { lesson: !!lesson, user: !!user });
       setError('Missing lesson or user data. Please refresh the page.');
@@ -231,14 +234,20 @@ export default function Home() {
     }
 
     // Skip shovId validation for local users
-    if (!isLocalUser(userId) && !lesson.shovId) {
-      console.error('Lesson missing shovId:', lesson);
-      setError('Lesson data is incomplete. Please refresh the page.');
-      return;
-    }
+    // This validation is now less relevant as we are submitting per question
+    // and the question object itself doesn't have a shovId
+    // The lesson.shovId is still relevant for the overall lesson tracking
+    // but not for individual question submission.
+    // We will rely on the backend to handle lesson tracking based on the overall lesson object.
+    // For now, we can remove this specific check for question submission.
+    // if (!isLocalUser(userId) && !lesson.shovId) {
+    //   console.error('Lesson missing shovId:', lesson);
+    //   setError('Lesson data is incomplete. Please refresh the page.');
+    //   return;
+    // }
 
-    if (answer === undefined || answer === null || answer === '') {
-      console.error('Answer is missing or empty:', { answer, type: typeof answer });
+    if (submittedAnswer === undefined || submittedAnswer === null || submittedAnswer === '') {
+      console.error('Answer is missing or empty:', { submittedAnswer, type: typeof submittedAnswer });
       setError('Please select an answer before submitting.');
       return;
     }
@@ -259,11 +268,11 @@ export default function Home() {
       
       if (isLocalUser(userId)) {
         // Handle local user submission
-        console.log('[Local Mode] Processing lesson submission locally');
-        const xpGained = isCorrect ? 15 : 5;
+        console.log('[Local Mode] Processing question submission locally');
+        const xpGained = isCorrect ? (question.xp || 10) : 0; // Use question.xp
         
         // Update local user data
-        const success = submitLocalLesson(userId, lesson.id, answer, isCorrect, xpGained);
+        const success = submitLocalLesson(userId, question, submittedAnswer, isCorrect, xpGained); // Pass question object
         if (!success) {
           throw new Error('Failed to save progress locally');
         }
@@ -291,7 +300,7 @@ export default function Home() {
         const response = await fetch('/api/lesson/submit', { 
           method: 'POST', 
           headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ user, lesson, answer }) 
+          body: JSON.stringify({ user, question, submittedAnswer, isCorrect }) 
         });
         
         if (!response.ok) {
@@ -318,45 +327,71 @@ export default function Home() {
         }
       }
 
-      // Show brief success message then load next content
-      setTimeout(async () => {
-        if (lesson.isCustom) {
-          setLesson(null);
-          setCustomLessonCompleted(true);
-        } else {
-          setLoadingMessage('Loading next lesson...');
-          setLoading(true);
-          try {
-            let nextLessonData;
-            
-            if (isLocalUser(userId)) {
-              // Generate next local lesson
-              nextLessonData = getTodaysLocalLesson(userId);
-            } else {
-              // Fetch next remote lesson
-              const lessonRes = await fetch(`/api/lesson/today/${userId}`);
-              if (!lessonRes.ok) {
-                if (lessonRes.status === 503) {
-                  throw new Error('Service is temporarily busy. Please try again in a moment.');
-                }
-                throw new Error('Failed to fetch next lesson');
-              }
-              nextLessonData = await lessonRes.json();
-            }
-            
-            setLesson(nextLessonData);
-          } catch (err) { 
-            setError(err.message); 
-          } finally { 
-            setLoading(false); 
-          }
-        }
-      }, 2000);
-    } catch (error) { 
-      setError(`Failed to submit lesson: ${error.message}`); 
+      } catch (error) { 
+      setError(`Failed to submit question: ${error.message}`); // Changed message
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleLessonComplete = async (completedLesson) => {
+    setIsSubmitting(true); // Indicate that we are processing lesson completion
+    setError(null);
+
+    try {
+      // Instead of fetching next lesson immediately, set a flag to show continue button
+      setLessonCompletedAndReadyToContinue(true);
+      setLesson(null); // Clear current lesson to show completion screen
+      setCustomLessonCompleted(completedLesson.isCustom); // Keep track if it was a custom lesson
+      setLastCompletedLessonTopic(completedLesson.topic); // Store the topic
+    } catch (error) {
+      setError(`Failed to process lesson completion: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const fetchNextLesson = async () => {
+    setLessonCompletedAndReadyToContinue(false); // Hide continue button
+    setLoadingMessage('Loading next lesson...');
+    setLoading(true);
+    setError(null);
+
+    try {
+      let nextLessonData;
+      
+      if (isLocalUser(userId)) {
+        // For local users, we don't have a generate API, so we'll just get a random one for now
+        // This might need a more sophisticated local lesson generation if the user wants to continue on topic locally
+        nextLessonData = getTodaysLocalLesson(userId);
+      } else {
+        // Use the last completed lesson's topic to generate the next lesson
+        const response = await fetch('/api/lesson/generate', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ 
+            prompt: lastCompletedLessonTopic, // Use the stored topic
+            user: user, // Pass the user object
+            questionType: 'mix' // Default to mix for now
+          }) 
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          if (response.status === 503) {
+            throw new Error('AI service is temporarily busy. Please try again in a moment.');
+          }
+          throw new Error(errorData.message || 'Failed to generate lesson.');
+        }
+        nextLessonData = await response.json();
+      }
+      
+      setLesson(nextLessonData);
+    } catch (err) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    };
   };
 
   const handleCustomGenerate = async () => {
@@ -370,7 +405,7 @@ export default function Home() {
       const response = await fetch('/api/lesson/generate', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ prompt: customTopic, user }) 
+        body: JSON.stringify({ prompt: customTopic, user, questionType: selectedQuestionType }) // Pass selectedQuestionType 
       });
       
       if (!response.ok) {
@@ -482,7 +517,7 @@ export default function Home() {
         )}
         
         {user && (
-          <div className="premium-stats-grid mb-12">
+          <div className="premium-stats-grid mb-12 max-w-full">
             <UserStats user={user} />
           </div>
         )}
@@ -505,6 +540,7 @@ export default function Home() {
                 onNextCustom={handleCustomGenerate}
                 customTopic={customTopic}
                 disabled={isSubmitting}
+                onLessonComplete={handleLessonComplete} // New prop
               />
               {isSubmitting && (
                 <div className="premium-submitting-indicator">
@@ -516,19 +552,20 @@ export default function Home() {
           
           {!loading && !progressLoading && !lesson && (
             <div className="premium-completion-section">
-              {customLessonCompleted ? (
+              {lessonCompletedAndReadyToContinue ? (
                 <div className="premium-completion-card">
                   <div className="text-6xl mb-6">🎉</div>
                   <h3 className="text-2xl font-bold text-gray-800 mb-4">Lesson Complete!</h3>
-                  <p className="text-gray-600 mb-8">Ready for another challenge? Generate a new lesson on any topic you can imagine.</p>
+                  <p className="text-gray-600 mb-8">Ready for another challenge?</p>
                   <button 
-                    onClick={() => setShowCustom(true)}
+                    onClick={fetchNextLesson} // Call new function
                     className="premium-button-primary"
                   >
-                    🎆 Create New Lesson
+                    🚀 Continue
                   </button>
                 </div>
               ) : (
+                // Original "All Done For Today!" or "Create New Lesson" if not ready to continue
                 <div className="premium-completion-card">
                   <div className="text-6xl mb-6">✨</div>
                   <h3 className="text-2xl font-bold text-gray-800 mb-4">All Done For Today!</h3>
@@ -569,6 +606,20 @@ export default function Home() {
                     className="premium-input"
                     disabled={isGenerating}
                   />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <label htmlFor="questionType" className="sr-only">Question Type</label>
+                    <select
+                      id="questionType"
+                      value={selectedQuestionType}
+                      onChange={(e) => setSelectedQuestionType(e.target.value)}
+                      className="premium-input flex-grow"
+                      disabled={isGenerating}
+                    >
+                      <option value="mix">Mix of Question Types</option>
+                      <option value="multiple_choice">Multiple Choice Only</option>
+                      <option value="true_false">True/False Only</option>
+                    </select>
+                  </div>
                   <button
                     onClick={handleCustomGenerate}
                     disabled={!customTopic.trim() || isGenerating}

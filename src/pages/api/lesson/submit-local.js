@@ -4,12 +4,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  const { lessonId, userId, answer, isCorrect } = req.body;
+  const { userId, question, submittedAnswer, isCorrect } = req.body; // New parameters
 
   // Validate required fields
-  if (!lessonId || !userId || answer === undefined || isCorrect === undefined) {
+  if (!userId || !question || submittedAnswer === undefined || isCorrect === undefined) { // Updated validation
+    const missingFields = [];
+    if (!userId) missingFields.push('userId');
+    if (!question) missingFields.push('question object');
+    if (submittedAnswer === undefined) missingFields.push('submittedAnswer');
+    if (isCorrect === undefined) missingFields.push('isCorrect');
     return res.status(400).json({ 
-      message: 'Missing required fields: lessonId, userId, answer, isCorrect' 
+      message: `Missing required fields: ${missingFields.join(', ')}` 
     });
   }
 
@@ -20,7 +25,7 @@ export default async function handler(req, res) {
 
   try {
     // Calculate XP based on correctness
-    const xpGained = isCorrect ? 15 : 5; // Give some XP even for wrong answers
+    const xpGained = isCorrect ? (question.xp || 10) : 0; // Use question.xp, 0 for incorrect answers
     
     // For local users, we just return success and let the client handle storage
     const response = {
@@ -37,7 +42,7 @@ export default async function handler(req, res) {
       response.levelUp = false; // Client will determine this based on local data
     }
 
-    console.log(`[Local Submit API] Processed lesson submission for local user: ${userId}`);
+    console.log(`[Local Submit API] Processed question submission for local user: ${userId}`);
     res.status(200).json(response);
 
   } catch (error) {

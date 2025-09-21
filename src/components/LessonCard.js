@@ -14,7 +14,8 @@ const correctMessages = [
   "Spectacular!",
 ];
 
-export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic }) {
+export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic, onLessonComplete }) { // Add onLessonComplete prop
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [showResult, setShowResult] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
@@ -31,6 +32,7 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
   const isWhiteTheme = mounted ? (theme === 'light' || theme === undefined) : true;
 
   useEffect(() => {
+    setCurrentQuestionIndex(0); // Reset to first question when lesson changes
     setSelectedAnswer('');
     setShowResult(false);
     setIsCorrect(false);
@@ -38,17 +40,40 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
   }, [lesson]);
 
   const handleSubmit = () => {
-    if (!lesson) return;
-    const correct = String(selectedAnswer) === String(lesson.answer);
+    if (!lesson || !lesson.questions || lesson.questions.length === 0) return;
+
+    const currentQuestion = lesson.questions[currentQuestionIndex];
+    const correct = String(selectedAnswer) === String(currentQuestion.answer);
+    
+    // Call onSubmit for the current question
+    onSubmit(currentQuestion, selectedAnswer, correct); // Pass currentQuestion, selectedAnswer, and correct status
+
     setIsCorrect(correct);
     setShowResult(true);
-    onSubmit(selectedAnswer, correct);
 
     if (correct) {
       const randomMessage = correctMessages[Math.floor(Math.random() * correctMessages.length)];
       setPositiveMessage(randomMessage);
     }
   };
+
+  const handleNextQuestion = () => {
+    setSelectedAnswer('');
+    setShowResult(false);
+    setIsCorrect(false);
+    setPositiveMessage('');
+    if (currentQuestionIndex < lesson.questions.length - 1) {
+      setCurrentQuestionIndex(prevIndex => prevIndex + 1);
+    } else {
+      // All questions answered, signal lesson completion to parent
+      if (onLessonComplete) {
+        onLessonComplete(lesson); // Pass the completed lesson object
+      }
+    }
+  };
+
+  const currentQuestion = lesson.questions[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex === lesson.questions.length - 1;
 
   if (showResult) {
     return (
@@ -73,30 +98,24 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
             </p>
           )}
 
-          <p className="text-lg text-gray-700 leading-relaxed mb-4">{lesson.explanation}</p>
+          <p className="text-lg text-gray-700 leading-relaxed mb-4">{currentQuestion.explanation}</p>
           {isCorrect && (
             <div className="inline-flex items-center space-x-2 bg-emerald-500 text-white px-4 py-2 rounded-full">
               <span>✨</span>
-              <span className="font-semibold">+{lesson.xp} XP earned!</span>
+              <span className="font-semibold">+{currentQuestion.xp} XP earned!</span>
             </div>
           )}
         </div>
 
-        {lesson.isCustom && (
-          <button
-            onClick={onNextCustom}
-            className="premium-button-primary w-full"
-          >
-            <span>🚀</span>
-            <span>Continue with "{customTopic}"</span>
-          </button>
-        )}
+        <Button
+          onClick={handleNextQuestion}
+          className="premium-button-primary w-full"
+        >
+          <span>{isLastQuestion ? '✅' : '➡️'}</span>
+          <span>{isLastQuestion ? 'Finish Lesson' : 'Next Question'}</span>
+        </Button>
       </div>
     );
-  }
-
-  if (!lesson) {
-    return null;
   }
 
   return (
@@ -104,7 +123,7 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
       isWhiteTheme 
         ? 'bg-white/95 border border-gray-200/60 text-gray-800 shadow-xl' 
         : 'bg-white/10 border border-white/20 text-white shadow-2xl'
-    } backdrop-blur-xl rounded-2xl p-8 max-w-lg mx-auto w-full animate-fade-in`}>
+    } backdrop-blur-xl rounded-2xl p-8 max-w-4xl mx-auto w-full animate-fade-in`}>
       <div className="mb-6">
         <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full ${
           isWhiteTheme 
@@ -124,11 +143,11 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
       
       <h2 className={`text-xl font-bold mb-6 leading-relaxed ${
         isWhiteTheme ? 'text-gray-800' : 'text-white'
-      }`}>{lesson.question}</h2>
+      }`}>{currentQuestion.question}</h2>
       
-      {lesson.type === 'multiple_choice' && (
+      {currentQuestion.type === 'multiple_choice' && (
         <div className="space-y-3 mb-8">
-          {lesson.options.map((option, index) => (
+          {currentQuestion.options.map((option, index) => (
             <Button 
               key={index}
               onClick={() => setSelectedAnswer(option)}
@@ -175,7 +194,7 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
         </div>
       )}
       
-      {lesson.type === 'true_false' && (
+      {currentQuestion.type === 'true_false' && (
         <div className="space-y-3 mb-8">
           {['true', 'false'].map((option, index) => (
             <Button 
@@ -239,7 +258,7 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
             }`
         }`}
       >
-        {!selectedAnswer ? 'Select an answer' : '🚀 Submit Answer'}
+        {!selectedAnswer ? 'Select an answer' : (isLastQuestion ? 'Finish Lesson' : 'Next Question')}
       </Button>
     </div>
   );
