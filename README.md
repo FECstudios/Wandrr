@@ -12,6 +12,11 @@ Wandrr is a Duolingo-style web application designed to help travelers learn abou
 - **Personalized Difficulty:** The app adjusts to your learning pace.
 - **Responsive Design:** Learn on the go with a mobile-friendly interface.
 
+## Live Demo
+
+Experience Wandrr live: [https://wandrr-liard.vercel.app/](https://wandrr-liard.vercel.app/)
+
+
 ## Getting Started
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.

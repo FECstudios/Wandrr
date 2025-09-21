@@ -23,6 +23,10 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  if (!lesson || !lesson.questions || lesson.questions.length === 0) {
+    return null; // Or a loading spinner, or a message
+  }
+
   // Handle hydration
   useEffect(() => {
     setMounted(true);
