@@ -174,6 +174,11 @@ export function submitLocalLesson(userId, lessonId, answer, isCorrect, xpGained 
       }];
     }
     
+    // Always add lesson to completed list (whether correct or incorrect)
+    if (lessonId && !user.completed_lessons?.includes(lessonId)) {
+      updates.completed_lessons = [...(user.completed_lessons || []), lessonId];
+    }
+    
     return updateLocalUser(userId, updates);
     
   } catch (error) {
@@ -183,15 +188,20 @@ export function submitLocalLesson(userId, lessonId, answer, isCorrect, xpGained 
 }
 
 /**
- * Get today's lesson for local user (generate a simple one)
+ * Get today's lesson for local user (generate a varied one)
  */
 export function getTodaysLocalLesson(userId) {
   if (!isClient() || !isLocalUser(userId)) return null;
   
-  // Simple local lesson generation
-  const lessons = [
+  // Get user's completed lessons to avoid repetition
+  const user = getLocalUser(userId);
+  const completedLessons = user?.completed_lessons || [];
+  
+  // Comprehensive lesson pool with variety
+  const allLessons = [
+    // Japan - Greetings & Social
     {
-      id: `local-lesson-${Date.now()}`,
+      id: `local-lesson-japan-greetings-1`,
       country: "Japan",
       topic: "greetings",
       question: "What is the most common greeting in Japan?",
@@ -199,12 +209,25 @@ export function getTodaysLocalLesson(userId) {
       options: ["Konnichiwa", "Ohayo", "Sayonara", "Arigato"],
       answer: "Konnichiwa",
       explanation: "Konnichiwa (こんにちは) is the most common greeting in Japan, used throughout the day.",
-      xp: 10,
-      difficulty: "beginner",
-      isLocal: true
+      xp: 15,
+      difficulty: "beginner"
     },
     {
-      id: `local-lesson-${Date.now() + 1}`,
+      id: `local-lesson-japan-greetings-2`,
+      country: "Japan",
+      topic: "greetings",
+      question: "In Japanese culture, bowing is an important part of greetings.",
+      type: "true_false",
+      options: ["true", "false"],
+      answer: "true",
+      explanation: "Bowing (ojigi) is a fundamental aspect of Japanese culture and is used in greetings, showing respect, and many social interactions.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    
+    // France - Dining & Social
+    {
+      id: `local-lesson-france-dining-1`,
       country: "France",
       topic: "dining",
       question: "In France, it's polite to keep your hands visible during meals.",
@@ -212,14 +235,163 @@ export function getTodaysLocalLesson(userId) {
       options: ["true", "false"],
       answer: "true",
       explanation: "In French dining etiquette, it's considered polite to keep your hands visible on the table, not in your lap.",
-      xp: 10,
-      difficulty: "beginner",
-      isLocal: true
+      xp: 15,
+      difficulty: "beginner"
+    },
+    {
+      id: `local-lesson-france-greetings-1`,
+      country: "France",
+      topic: "greetings",
+      question: "What is the traditional French greeting between friends?",
+      type: "multiple_choice",
+      options: ["Handshake", "Air kisses (la bise)", "Bow", "Wave"],
+      answer: "Air kisses (la bise)",
+      explanation: "La bise (air kisses on the cheeks) is the traditional greeting between friends and family in France.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    
+    // Italy - Dining & Social
+    {
+      id: `local-lesson-italy-dining-1`,
+      country: "Italy",
+      topic: "dining",
+      question: "In Italy, it's common to drink cappuccino after dinner.",
+      type: "true_false",
+      options: ["true", "false"],
+      answer: "false",
+      explanation: "In Italy, cappuccino is typically enjoyed only in the morning. Drinking it after dinner is considered unusual.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    {
+      id: `local-lesson-italy-social-1`,
+      country: "Italy",
+      topic: "social",
+      question: "What is considered appropriate when entering an Italian home?",
+      type: "multiple_choice",
+      options: ["Keep shoes on", "Remove shoes", "Bring flowers", "Arrive early"],
+      answer: "Bring flowers",
+      explanation: "Bringing flowers or a small gift when visiting an Italian home is considered polite and respectful.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    
+    // Germany - Business & Social
+    {
+      id: `local-lesson-germany-business-1`,
+      country: "Germany",
+      topic: "business",
+      question: "What is the appropriate greeting in a German business setting?",
+      type: "multiple_choice",
+      options: ["Hallo", "Guten Tag", "Hey", "Servus"],
+      answer: "Guten Tag",
+      explanation: "Guten Tag is the most formal and appropriate greeting for German business settings.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    {
+      id: `local-lesson-germany-social-1`,
+      country: "Germany",
+      topic: "social",
+      question: "Punctuality is highly valued in German culture.",
+      type: "true_false",
+      options: ["true", "false"],
+      answer: "true",
+      explanation: "Germans place great importance on punctuality and being on time is considered a sign of respect.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    
+    // Brazil - Social & Greetings
+    {
+      id: `local-lesson-brazil-social-1`,
+      country: "Brazil",
+      topic: "social",
+      question: "Personal space in Brazilian culture is typically smaller than in North American culture.",
+      type: "true_false",
+      options: ["true", "false"],
+      answer: "true",
+      explanation: "Brazilians generally stand closer and have more physical contact during conversations compared to North Americans.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    {
+      id: `local-lesson-brazil-greetings-1`,
+      country: "Brazil",
+      topic: "greetings",
+      question: "How do Brazilians typically greet close friends?",
+      type: "multiple_choice",
+      options: ["Firm handshake", "Cheek kisses and hugs", "Bow", "Formal nod"],
+      answer: "Cheek kisses and hugs",
+      explanation: "Brazilians are warm and affectionate, typically greeting close friends with cheek kisses and hugs.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    
+    // Spain - Dining & Social
+    {
+      id: `local-lesson-spain-dining-1`,
+      country: "Spain",
+      topic: "dining",
+      question: "What time do Spaniards typically eat dinner?",
+      type: "multiple_choice",
+      options: ["6:00 PM", "7:00 PM", "9:00 PM", "11:00 PM"],
+      answer: "9:00 PM",
+      explanation: "In Spain, dinner is typically eaten much later than in other countries, usually around 9:00-10:00 PM.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    
+    // UK - Social & Business
+    {
+      id: `local-lesson-uk-social-1`,
+      country: "United Kingdom",
+      topic: "social",
+      question: "Queuing (waiting in line) is taken very seriously in British culture.",
+      type: "true_false",
+      options: ["true", "false"],
+      answer: "true",
+      explanation: "The British are famous for their orderly queuing culture, and cutting in line is considered very rude.",
+      xp: 15,
+      difficulty: "beginner"
+    },
+    
+    // India - Social & Greetings  
+    {
+      id: `local-lesson-india-greetings-1`,
+      country: "India",
+      topic: "greetings",
+      question: "What is the traditional Indian greeting gesture?",
+      type: "multiple_choice",
+      options: ["Handshake", "Namaste", "Bow", "Wave"],
+      answer: "Namaste",
+      explanation: "Namaste, performed by pressing palms together and bowing slightly, is the traditional Indian greeting.",
+      xp: 15,
+      difficulty: "beginner"
     }
   ];
   
-  // Return a random lesson
-  return lessons[Math.floor(Math.random() * lessons.length)];
+  // Filter out completed lessons
+  const availableLessons = allLessons.filter(lesson => 
+    !completedLessons.includes(lesson.id)
+  );
+  
+  // If all lessons completed, reset and start over
+  if (availableLessons.length === 0) {
+    console.log('[Local Lessons] All lessons completed, restarting cycle');
+    return allLessons[Math.floor(Math.random() * allLessons.length)];
+  }
+  
+  // Return a random available lesson
+  const selectedLesson = availableLessons[Math.floor(Math.random() * availableLessons.length)];
+  
+  // Add timestamp and local flag
+  return {
+    ...selectedLesson,
+    id: `${selectedLesson.id}-${Date.now()}`,
+    isLocal: true
+  };
 }
 
 /**
