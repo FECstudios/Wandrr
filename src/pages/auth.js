@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { LoadingSpinner } from '../components/ProgressBar';
-import { setStorageItem } from '../lib/clientStorage';
+import { setStorageItem, getStorageItem } from '../lib/clientStorage';
 
 export default function AuthPage() {
   const [email, setEmail] = useState('');
@@ -84,7 +84,13 @@ export default function AuthPage() {
           alert('Welcome! You\'re now in local mode. Your progress will be saved in your browser.');
         }
         
-        router.push('/'); // Redirect to home page
+        // Check if onboarding has been completed
+        const onboardingCompleted = getStorageItem('onboarding_completed');
+        if (onboardingCompleted) {
+          router.push('/'); // Go to main app if onboarding is done
+        } else {
+          router.push('/onboarding'); // Go to onboarding for new users
+        }
       } else {
         // Show success message and add a brief delay before enabling login
         alert(`${data.message} Please wait a moment before logging in.`);

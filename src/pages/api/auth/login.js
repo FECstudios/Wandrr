@@ -59,10 +59,13 @@ export default async function handler(req, res) {
           fullError: error.toString()
         });
         
-        // Check if it's a capacity/rate limit error
+        // Check if it's a capacity/rate limit error or search service unavailable
         const isRateLimitError = error.message.includes('Capacity temporarily exceeded') || 
                                error.message.includes('rate limit') ||
                                error.message.includes('3040');
+        
+        const isSearchServiceError = error.message.includes('Search service is temporarily unavailable') ||
+                                   error.message.includes('service temporarily unavailable');
         
         if (attempts >= maxAttempts) {
           if (isRateLimitError) {
@@ -71,6 +74,10 @@ export default async function handler(req, res) {
               message: 'Service temporarily unavailable due to high demand. Please try again in a moment.',
               retryAfter: 30 // Suggest retry after 30 seconds
             });
+          } else if (isSearchServiceError) {
+            console.log(`[Login API] Search service unavailable after ${maxAttempts} attempts, will create local user`);
+            userResults = { items: [] }; // Set empty results to trigger local fallback
+            break; // Exit retry loop to proceed to local fallback
           } else {
             // Only trigger local fallback for database errors, not auth errors
             const isDatabaseError = error.message.includes('9002') || 
@@ -92,6 +99,8 @@ export default async function handler(req, res) {
         // Calculate exponential backoff delay with jitter for rate limiting
         const delay = isRateLimitError 
           ? baseDelay * Math.pow(3, attempts - 1) + Math.random() * 1000 // Longer delay for rate limits
+          : isSearchServiceError
+          ? baseDelay * Math.pow(2, attempts - 1) + Math.random() * 500 // Medium delay for search service
           : baseDelay * Math.pow(2, attempts - 1); // Standard exponential backoff
         
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -177,7 +186,11 @@ export default async function handler(req, res) {
     console.error('Error during login:', error);
     
     // If we get here and it's not a handled error, create local user as fallback
-    if (error.message && (error.message.includes('9002') || error.message.includes('unknown internal error'))) {
+    if (error.message && (
+      error.message.includes('9002') || 
+      error.message.includes('unknown internal error') ||
+      error.message.includes('Search service is temporarily unavailable')
+    )) {
       console.log(`[Login API] Database error detected, creating local user for: ${email}`);
       
       try {
