@@ -17,9 +17,9 @@ module.exports = {
       },
       keyframes: {
         'indeterminate-progress': {
-          '0%': { left: '-35%', right: '100%' },
-          '60%': { left: '100%', right: '-90%' },
-          '100%': { left: '100%', right: '-90%' },
+          '0%': { transform: 'translateX(-100%)' },
+          '50%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(100%)' },
         },
       },
     },

@@ -4,14 +4,14 @@ const LoadingBar = ({ message = 'Loading...', progress = null, showMessage = tru
   return (
     <div className="w-full">
       {/* Top Progress Bar */}
-      <div className="fixed top-0 left-0 right-0 h-2 z-50 bg-gray-100/80 backdrop-blur-sm">
+      <div className="fixed top-0 left-0 right-0 h-2 z-50 bg-gray-100/80 backdrop-blur-sm overflow-hidden">
         {progress !== null ? (
           <div 
             className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500 ease-out shadow-lg"
             style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
           ></div>
         ) : (
-          <div className="absolute h-full w-full bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-indeterminate-progress"></div>
+          <div className="absolute h-full w-1/3 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-indeterminate-progress"></div>
         )}
       </div>
       
