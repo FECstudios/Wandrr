@@ -20,9 +20,8 @@ export default async function handler(req, res) {
         attempts++;
         console.log(`[user API] Fetching user from Shov... (Attempt ${attempts}/${maxAttempts})`);
         
-        userSearchResults = await shov.search('user', { 
-          collection: 'users', 
-          filters: { id: userId },
+        userSearchResults = await shov.where('users', { 
+          filter: { id: userId },
           limit: 1
         });
         

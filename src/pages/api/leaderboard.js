@@ -18,8 +18,8 @@ export default async function handler(req, res) {
         attempts++;
         console.log(`[Leaderboard API] Fetching users from Shov... (Attempt ${attempts}/${maxAttempts})`);
         
-        // Using shov.search to get all users
-        userResults = await shov.search('all users', { collection: 'users' });
+        // Using shov.where to get all users
+        userResults = await shov.where('users');
         
         console.log(`[Leaderboard API] Attempt ${attempts} successful.`);
         break; // Success, exit loop

@@ -29,17 +29,49 @@ export default async function handler(req, res) {
       try {
         attempts++;
         
-        userResults = await shov.search('user', { 
-          collection: 'users', 
-          filters: { email },
+        userResults = await shov.where('users', { 
+          filter: { email },
           limit: 1
         });
+        
+        // DEBUG: Also try to get all users to see what's available
+        if (attempts === 1) {
+          try {
+            const allUsersResult = await shov.where('users');
+            console.log(`[Login API] DEBUG - All users in database:`, {
+              totalUsers: allUsersResult?.items?.length || 0,
+              userEmails: allUsersResult?.items?.map(item => item?.value?.email) || []
+            });
+          } catch (debugError) {
+            console.error(`[Login API] DEBUG - Failed to get all users:`, debugError.message);
+          }
+        }
         
         console.log(`[Login API] Search result for ${email}:`, {
           totalItems: userResults?.items?.length || 0,
           hasUser: userResults?.items?.length > 0,
           userExists: !!userResults?.items?.[0]?.value
         });
+        
+        // DEBUG: If no user found with filter, try manual search
+        if (userResults?.items?.length === 0 && attempts === 1) {
+          try {
+            const allUsersResult = await shov.where('users');
+            const manualMatch = allUsersResult?.items?.find(item => item?.value?.email === email);
+            console.log(`[Login API] Manual search result:`, {
+              manualMatchFound: !!manualMatch,
+              totalUsersInDB: allUsersResult?.items?.length || 0,
+              allEmails: allUsersResult?.items?.map(item => item?.value?.email) || []
+            });
+            
+            if (manualMatch) {
+              console.log(`[Login API] Found user manually but filter query failed - using manual result`);
+              userResults = { items: [manualMatch] };
+            }
+          } catch (manualError) {
+            console.error(`[Login API] Manual search failed:`, manualError.message);
+          }
+        }
         
         if (userResults?.items?.length > 0) {
             break; // User found, exit loop

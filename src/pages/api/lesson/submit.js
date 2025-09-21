@@ -56,9 +56,8 @@ export default async function handler(req, res) {
           attempts++;
           console.log(`[Submit API] Fetching user Shov ID... (Attempt ${attempts}/${maxAttempts})`);
           
-          const userSearchResults = await shov.search('user', { 
-            collection: 'users', 
-            filters: { id: userId },
+          const userSearchResults = await shov.where('users', { 
+            filter: { id: userId },
             limit: 1
           });
           

@@ -30,9 +30,8 @@ export default async function handler(req, res) {
         attempts++;
         console.log(`[Signup API] Checking for existing user... (Attempt ${attempts}/${maxAttempts})`);
         
-        existingUserResults = await shov.search('user', { 
-          collection: 'users', 
-          filters: { email },
+        existingUserResults = await shov.where('users', { 
+          filter: { email },
           limit: 1
         });
         
@@ -112,23 +111,73 @@ export default async function handler(req, res) {
     // Add user to database
     const addResult = await shov.add('users', newUser);
     console.log('[Signup API] User creation result:', addResult);
+    console.log('[Signup API] User created with Shov ID:', addResult?.id);
     
-    // Wait a moment for data propagation
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait longer for data propagation and search index update
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds
     
-    // Verify user was created by searching for it
+    // DEBUG: Let's try to get ALL users to see what's in the database
     try {
-      const verificationResult = await shov.search('user', { 
-        collection: 'users', 
-        filters: { email },
-        limit: 1
+      const allUsersResult = await shov.where('users');
+      console.log('[Signup API] DEBUG - All users in database:', {
+        totalUsers: allUsersResult?.items?.length || 0,
+        userEmails: allUsersResult?.items?.map(item => item?.value?.email) || []
       });
-      console.log('[Signup API] User verification:', {
-        found: verificationResult?.items?.length > 0,
-        userEmail: verificationResult?.items?.[0]?.value?.email
-      });
-    } catch (verifyError) {
-      console.error('[Signup API] User verification failed:', verifyError.message);
+    } catch (debugError) {
+      console.error('[Signup API] DEBUG - Failed to get all users:', debugError.message);
+    }
+    
+    // Verify user was created by searching for it with retry logic
+    let verificationAttempts = 0;
+    const maxVerificationAttempts = 3;
+    let userFound = false;
+    
+    while (verificationAttempts < maxVerificationAttempts && !userFound) {
+      try {
+        verificationAttempts++;
+        
+        // Try both approaches: specific filter and manual search
+        const verificationResult = await shov.where('users', { 
+          filter: { email },
+          limit: 1
+        });
+        
+        // Also try getting all users and filtering manually
+        const allUsersResult = await shov.where('users');
+        const manualMatch = allUsersResult?.items?.find(item => item?.value?.email === email);
+        
+        userFound = verificationResult?.items?.length > 0;
+        
+        console.log(`[Signup API] User verification attempt ${verificationAttempts}:`, {
+          filterQueryFound: userFound,
+          filterQueryResults: verificationResult?.items?.length || 0,
+          manualSearchFound: !!manualMatch,
+          totalUsersInDB: allUsersResult?.items?.length || 0,
+          targetEmail: email,
+          foundEmails: allUsersResult?.items?.map(item => item?.value?.email) || []
+        });
+        
+        // If manual match found but filter didn't work, use manual result
+        if (!userFound && manualMatch) {
+          userFound = true;
+          console.log('[Signup API] Filter query failed but manual search found user - possible indexing issue');
+        }
+        
+        if (!userFound && verificationAttempts < maxVerificationAttempts) {
+          console.log(`[Signup API] User not found in search index yet, waiting 1s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+      } catch (verifyError) {
+        console.error(`[Signup API] User verification attempt ${verificationAttempts} failed:`, verifyError.message);
+        if (verificationAttempts < maxVerificationAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
+    
+    if (!userFound) {
+      console.warn('[Signup API] User verification failed after all attempts, but user was created successfully');
     }
 
     res.status(201).json({ message: 'User registered successfully.', userId: newUser.id });

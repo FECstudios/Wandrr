@@ -21,10 +21,9 @@ export default async function handler(req, res) {
         attempts++;
         console.log(`[Today's Lesson API] Fetching user from Shov... (Attempt ${attempts}/${maxAttempts})`);
         
-        // Using shov.search with filter on the 'id' field within the value object
-        userResults = await shov.search('user', {
-          collection: 'users',
-          filters: { id: userId },
+        // Using shov.where with filter on the 'id' field within the value object
+        userResults = await shov.where('users', {
+          filter: { id: userId },
           limit: 1
         });
         
