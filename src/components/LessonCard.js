@@ -23,14 +23,18 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  if (!lesson || !lesson.questions || lesson.questions.length === 0) {
-    return null; // Or a loading spinner, or a message
-  }
-
   // Handle hydration
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  if (!lesson || !lesson.questions || lesson.questions.length === 0) {
+    return (
+      <div className="text-center text-xl text-gray-500 dark:text-gray-400 p-8">
+        Loading lesson...
+      </div>
+    );
+  }
 
   // Determine if using white theme (default to white based on user preference)
   const isWhiteTheme = mounted ? (theme === 'light' || theme === undefined) : true;
