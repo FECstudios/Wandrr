@@ -1,10 +1,11 @@
 /**
  * User caching utilities to reduce redundant API calls
  * Implements client-side caching for user data including Shov IDs
- * SSR-safe implementation
+ * SSR-safe implementation with local user support
  */
 
 import { isClient } from './clientStorage';
+import { getLocalUser, storeLocalUser, isLocalUser } from './localUserStorage';
 
 // In-memory cache for user data (client-side only)
 let userCache;
@@ -163,13 +164,37 @@ export function getCacheStats() {
 }
 
 /**
- * Enhanced user fetch with caching
+ * Enhanced user fetch with caching and local user support
  * @param {string} userId - User ID
  * @param {boolean} useCache - Whether to use cache (default: true)
  * @returns {Promise<Object>} User data with Shov ID
  */
 export async function fetchUserWithCache(userId, useCache = true) {
-  // Check cache first
+  // Handle local users
+  if (isLocalUser(userId)) {
+    console.log(`[Cache] Fetching local user: ${userId}`);
+    let localUserData = getLocalUser(userId);
+    
+    if (!localUserData) {
+      // Create default local user data
+      localUserData = {
+        id: userId,
+        username: 'Local User',
+        xp: 0,
+        streak: 0,
+        completed_lessons: [],
+        mistakes: [],
+        preferences: ['greetings', 'dining'],
+        created_at: new Date().toISOString(),
+        isLocalUser: true
+      };
+      storeLocalUser(localUserData);
+    }
+    
+    return localUserData;
+  }
+  
+  // Check cache first for remote users
   if (useCache) {
     const cached = getCachedUser(userId);
     if (cached) {

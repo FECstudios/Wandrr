@@ -104,7 +104,7 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
       isWhiteTheme 
         ? 'bg-white/95 border border-gray-200/60 text-gray-800 shadow-xl' 
         : 'bg-white/10 border border-white/20 text-white shadow-2xl'
-    } backdrop-blur-xl rounded-2xl p-8 max-w-md mx-auto animate-fade-in`}>
+    } backdrop-blur-xl rounded-2xl p-8 max-w-lg mx-auto w-full animate-fade-in`}>
       <div className="mb-6">
         <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full ${
           isWhiteTheme 
@@ -136,12 +136,12 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
                 selectedAnswer === option 
                   ? `${
                     isWhiteTheme 
-                      ? 'bg-blue-50 border-2 border-blue-300 text-gray-800 shadow-lg transform scale-[1.02]'
+                      ? 'bg-blue-600 border-2 border-blue-600 text-white shadow-lg transform scale-[1.02]'
                       : 'bg-white/40 border-2 border-white/80 text-white shadow-xl transform scale-[1.02]'
                   }` 
                   : `${
                     isWhiteTheme 
-                      ? 'bg-white/70 border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-md backdrop-blur-sm'
+                      ? 'bg-white/90 border border-gray-300 text-gray-800 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md backdrop-blur-sm'
                       : 'bg-white/10 border border-white/20 text-white/90 hover:bg-white/20 hover:border-white/40 backdrop-blur-sm'
                   }`
               }`}>
@@ -150,23 +150,23 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
                   selectedAnswer === option 
                     ? `${
                       isWhiteTheme 
-                        ? 'bg-blue-600 border-blue-600 shadow-lg'
+                        ? 'bg-white border-white shadow-lg'
                         : 'bg-white border-white shadow-lg'
                     }` 
                     : `${
                       isWhiteTheme 
-                        ? 'border-gray-400 bg-white'
+                        ? 'border-gray-500 bg-white'
                         : 'border-white/40'
                     }`
                 }`}>
                   {selectedAnswer === option && (
                     <div className={`w-2 h-2 rounded-full m-0.5 ${
-                      isWhiteTheme ? 'bg-white' : 'bg-purple-600'
+                      isWhiteTheme ? 'bg-blue-600' : 'bg-purple-600'
                     }`}></div>
                   )}
                 </div>
                 <span className={`font-medium ${
-                  isWhiteTheme ? 'text-gray-600' : 'text-white/80'
+                  isWhiteTheme ? 'text-gray-700' : 'text-white/80'
                 }`}>{String.fromCharCode(65 + index)}.</span>
                 <span className={selectedAnswer === option ? 'font-semibold' : ''}>{option}</span>
               </div>
@@ -185,12 +185,12 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
                 selectedAnswer === option 
                   ? `${
                     isWhiteTheme
-                      ? 'bg-blue-50 border-2 border-blue-300 text-gray-800 shadow-lg transform scale-[1.02]'
+                      ? 'bg-blue-600 border-2 border-blue-600 text-white shadow-lg transform scale-[1.02]'
                       : 'bg-white/40 border-2 border-white/80 text-white shadow-xl transform scale-[1.02]'
                   }`
                   : `${
                     isWhiteTheme
-                      ? 'bg-white/70 border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow-md backdrop-blur-sm'
+                      ? 'bg-white/90 border border-gray-300 text-gray-800 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md backdrop-blur-sm'
                       : 'bg-white/10 border border-white/20 text-white/90 hover:bg-white/20 hover:border-white/40 backdrop-blur-sm'
                   }`
               }`}>
@@ -199,18 +199,18 @@ export default function LessonCard({ lesson, onSubmit, onNextCustom, customTopic
                   selectedAnswer === option 
                     ? `${
                       isWhiteTheme
-                        ? 'bg-blue-600 border-blue-600 shadow-lg'
+                        ? 'bg-white border-white shadow-lg'
                         : 'bg-white border-white shadow-lg'
                     }`
                     : `${
                       isWhiteTheme
-                        ? 'border-gray-400 bg-white'
+                        ? 'border-gray-500 bg-white'
                         : 'border-white/40'
                     }`
                 }`}>
                   {selectedAnswer === option && (
                     <div className={`w-2 h-2 rounded-full m-0.5 ${
-                      isWhiteTheme ? 'bg-white' : 'bg-purple-600'
+                      isWhiteTheme ? 'bg-blue-600' : 'bg-purple-600'
                     }`}></div>
                   )}
                 </div>

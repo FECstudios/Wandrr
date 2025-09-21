@@ -8,6 +8,7 @@ import LessonCard from '../components/LessonCard';
 import { LoadingBar, LoadingSpinner, LoadingOverlay, useLoadingProgress } from '../components/ProgressBar';
 import { fetchUserWithCache, setCachedUser, clearUserCache } from '../lib/userCache';
 import { getStorageItem, setStorageItem, removeStorageItem, isClient } from '../lib/clientStorage';
+import { isLocalUser, getLocalUser, updateLocalUser, submitLocalLesson, getTodaysLocalLesson } from '../lib/localUserStorage';
 import Button from '../components/Button';
 
 // --- Reusable UI Components ---
@@ -16,7 +17,7 @@ const ErrorAlert = ({ message, onClose }) => (
   <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative shadow-md my-4 animate-fade-in" role="alert">
     <span className="block sm:inline">{message}</span>
     <Button onClick={onClose} className="absolute top-0 bottom-0 right-0 px-4 py-3">
-      <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+      <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" aria-label="Close"><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
     </Button>
   </div>
 );
@@ -71,17 +72,23 @@ const CompletionCard = ({ onGenerateClick, message, title }) => (
 );
 
 const LevelUpModal = ({ newLevel, onClose }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 animate-fade-in-fast">
-    <div className="bg-background rounded-2xl shadow-2xl p-8 text-center max-w-sm mx-auto transform scale-100 animate-pop-in">
-      <h2 className="text-4xl font-bold text-yellow-500 mb-4">LEVEL UP!</h2>
-      <p className="text-xl text-foreground/80 mb-2">You've reached</p>
-      <p className="text-6xl font-bold text-primary mb-6">Level {newLevel}</p>
-      <Button 
+  <div className="premium-modal-overlay">
+    <div className="premium-modal-card text-center max-w-md">
+      <div className="text-6xl mb-6">🎉</div>
+      <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+        LEVEL UP!
+      </h2>
+      <p className="text-lg text-gray-600 mb-2">Congratulations! You've reached</p>
+      <p className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-8">
+        Level {newLevel}
+      </p>
+      <button
         onClick={onClose}
-        className="px-8 py-3 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition-all duration-200 transform hover:scale-105"
+        className="premium-button-primary w-full"
       >
-        Keep Going!
-      </Button>
+        <span>🚀</span>
+        <span>Keep Going!</span>
+      </button>
     </div>
   </div>
 );
@@ -164,14 +171,40 @@ export default function Home() {
         
         // Step 2: Fetch today's lesson
         nextStep(loadingSteps);
-        const lessonRes = await fetch(`/api/lesson/today/${userId}`);
-        if (!lessonRes.ok) {
-          if (lessonRes.status === 503) {
-            throw new Error('Lesson service is temporarily busy. Please try again in a moment.');
+        let lessonData;
+        
+        if (isLocalUser(userId)) {
+          // Handle local user lessons
+          console.log('[Local Mode] Generating local lesson');
+          lessonData = getTodaysLocalLesson(userId);
+          if (!lessonData) {
+            // Fallback lesson for local users
+            lessonData = {
+              id: `local-lesson-${Date.now()}`,
+              country: "Welcome",
+              topic: "getting_started",
+              question: "Welcome to Wandrr! Are you ready to learn about cultures around the world?",
+              type: "true_false",
+              options: ["true", "false"],
+              answer: "true",
+              explanation: "Great! You're now in local mode. Your progress will be saved in your browser.",
+              xp: 10,
+              difficulty: "beginner",
+              isLocal: true
+            };
           }
-          throw new Error('Failed to fetch today\'s lesson');
+        } else {
+          // Handle remote user lessons
+          const lessonRes = await fetch(`/api/lesson/today/${userId}`);
+          if (!lessonRes.ok) {
+            if (lessonRes.status === 503) {
+              throw new Error('Lesson service is temporarily busy. Please try again in a moment.');
+            }
+            throw new Error('Failed to fetch today\'s lesson');
+          }
+          lessonData = await lessonRes.json();
         }
-        const lessonData = await lessonRes.json();
+        
         setLesson(lessonData);
         
         // Step 3: Finalize
@@ -197,8 +230,8 @@ export default function Home() {
       return;
     }
 
-    // Additional validation before submission
-    if (!lesson.shovId) {
+    // Skip shovId validation for local users
+    if (!isLocalUser(userId) && !lesson.shovId) {
       console.error('Lesson missing shovId:', lesson);
       setError('Lesson data is incomplete. Please refresh the page.');
       return;
@@ -222,32 +255,66 @@ export default function Home() {
     try {
       const oldLevel = Math.floor((user.xp || 0) / 50);
 
-      const response = await fetch('/api/lesson/submit', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ user, lesson, answer }) 
-      });
+      let result;
       
-      if (!response.ok) {
-        if (response.status === 503) {
-          throw new Error('Service is temporarily busy. Your answer will be saved when service is available.');
-        }
-        const errorText = await response.text();
-        throw new Error(`Submit failed: ${response.status} ${errorText}`);
-      }
-      
-      const result = await response.json();
-      
-      if (result.updatedUser) {
-        // Update local state and cache with fresh user data
-        setUser(result.updatedUser);
-        setCachedUser(userId, result.updatedUser); // Update cache
+      if (isLocalUser(userId)) {
+        // Handle local user submission
+        console.log('[Local Mode] Processing lesson submission locally');
+        const xpGained = isCorrect ? 15 : 5;
         
-        const newLevel = Math.floor((result.updatedUser.xp || 0) / 50);
+        // Update local user data
+        const success = submitLocalLesson(userId, lesson.id, answer, isCorrect, xpGained);
+        if (!success) {
+          throw new Error('Failed to save progress locally');
+        }
+        
+        // Get updated user data
+        const updatedUser = getLocalUser(userId);
+        setUser(updatedUser);
+        
+        result = {
+          message: isCorrect ? 'Correct! Well done!' : 'Not quite right, but keep learning!',
+          xpGained,
+          updatedUser,
+          localMode: true
+        };
+        
+        const newLevel = Math.floor((updatedUser.xp || 0) / 50);
         if (newLevel > oldLevel) {
           setNewLevel(newLevel);
           setShowLevelUp(true);
           playLevelUp();
+        }
+        
+      } else {
+        // Handle remote user submission
+        const response = await fetch('/api/lesson/submit', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ user, lesson, answer }) 
+        });
+        
+        if (!response.ok) {
+          if (response.status === 503) {
+            throw new Error('Service is temporarily busy. Your answer will be saved when service is available.');
+          }
+          const errorText = await response.text();
+          throw new Error(`Submit failed: ${response.status} ${errorText}`);
+        }
+        
+        result = await response.json();
+        
+        if (result.updatedUser) {
+          // Update local state and cache with fresh user data
+          setUser(result.updatedUser);
+          setCachedUser(userId, result.updatedUser); // Update cache
+          
+          const newLevel = Math.floor((result.updatedUser.xp || 0) / 50);
+          if (newLevel > oldLevel) {
+            setNewLevel(newLevel);
+            setShowLevelUp(true);
+            playLevelUp();
+          }
         }
       }
 
@@ -260,14 +327,24 @@ export default function Home() {
           setLoadingMessage('Loading next lesson...');
           setLoading(true);
           try {
-            const lessonRes = await fetch(`/api/lesson/today/${userId}`);
-            if (!lessonRes.ok) {
-              if (lessonRes.status === 503) {
-                throw new Error('Service is temporarily busy. Please try again in a moment.');
+            let nextLessonData;
+            
+            if (isLocalUser(userId)) {
+              // Generate next local lesson
+              nextLessonData = getTodaysLocalLesson(userId);
+            } else {
+              // Fetch next remote lesson
+              const lessonRes = await fetch(`/api/lesson/today/${userId}`);
+              if (!lessonRes.ok) {
+                if (lessonRes.status === 503) {
+                  throw new Error('Service is temporarily busy. Please try again in a moment.');
+                }
+                throw new Error('Failed to fetch next lesson');
               }
-              throw new Error('Failed to fetch next lesson');
+              nextLessonData = await lessonRes.json();
             }
-            setLesson(await lessonRes.json());
+            
+            setLesson(nextLessonData);
           } catch (err) { 
             setError(err.message); 
           } finally { 
@@ -355,6 +432,12 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center space-x-6">
+            {isLocalUser(userId) && (
+              <div className="hidden md:flex items-center text-orange-600 text-sm bg-orange-50 px-3 py-1 rounded-full border border-orange-200">
+                <div className="w-2 h-2 bg-orange-500 rounded-full mr-2 animate-pulse"></div>
+                <span className="font-medium">Local Mode</span>
+              </div>
+            )}
             <div className="hidden md:flex items-center text-gray-600 text-sm">
               <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
               <span>Learning in progress</span>

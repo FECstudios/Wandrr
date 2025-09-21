@@ -7,33 +7,37 @@ export default function UserStats({ user }) {
   const completedLessons = user.completed_lessons?.length || 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-gray-800">Your Progress</h2>
+    <div className="premium-card max-w-2xl mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold text-gray-800">Your Progress</h2>
         <div className="text-right">
-          <div className="text-2xl font-bold text-primary">Level {level}</div>
+          <div className="text-2xl font-bold text-gray-800">
+            Level {level}
+          </div>
           <div className="text-sm text-gray-600">{xp} XP</div>
         </div>
       </div>
       
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="text-center p-3 bg-orange-50 rounded-lg">
-          <div className="text-2xl font-bold text-orange-600">{streak}</div>
-          <div className="text-sm text-gray-600">Day Streak</div>
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-gray-200/50 shadow-sm">
+          <div className="text-2xl font-bold text-orange-600 mb-1">{streak}</div>
+          <div className="text-sm font-medium text-gray-700">Day Streak</div>
         </div>
-        <div className="text-center p-3 bg-blue-50 rounded-lg">
-          <div className="text-2xl font-bold text-blue-600">{completedLessons}</div>
-          <div className="text-sm text-gray-600">Lessons</div>
+        <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-gray-200/50 shadow-sm">
+          <div className="text-2xl font-bold text-blue-600 mb-1">{completedLessons}</div>
+          <div className="text-sm font-medium text-gray-700">Lessons</div>
         </div>
       </div>
       
-      <div className="w-full bg-gray-200 rounded-full h-3">
+      <div className="bg-gray-200/80 backdrop-blur-sm rounded-full h-3 shadow-inner">
         <div 
-          className="bg-primary h-3 rounded-full transition-all duration-300"
+          className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-700 ease-out"
           style={{ width: `${(progress / 50) * 100}%` }}
         ></div>
       </div>
-      <div className="text-xs text-gray-600 mt-1">{progress}/50 XP to next level</div>
+      <div className="text-sm text-gray-600 mt-2 text-center">
+        {progress}/50 XP to next level
+      </div>
     </div>
   );
 }

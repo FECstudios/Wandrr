@@ -313,6 +313,32 @@ body {
   text-align: center;
 }
 
+/* Premium Stats Grid */
+.premium-stats-grid {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 3rem;
+}
+
+/* Premium Lesson Container */
+.lesson-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  width: 100%;
+}
+
+/* Premium Completion Section */
+.premium-completion-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
 /* Animations */
 @keyframes premium-fade-in {
   from { opacity: 0; }
@@ -338,6 +364,27 @@ body {
 @keyframes premium-floating {
   0%, 100% { transform: translateY(0px) rotate(0deg); }
   50% { transform: translateY(-8px) rotate(2deg); }
+}
+
+/* Fade In Animation */
+.animate-fade-in {
+  animation: premium-fade-in 0.6s ease-out;
+}
+
+/* Pop In Animation for Modal */
+.animate-pop-in {
+  animation: premium-pop-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes premium-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 /* Responsive Design */
